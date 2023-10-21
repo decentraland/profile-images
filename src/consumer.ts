@@ -6,6 +6,7 @@ import { config, getAWSConfig } from "./modules/config";
 import { Queue } from "./modules/queue";
 import { sleep } from "./modules/sleep";
 import { Bucket } from "./modules/bucket";
+import { Snapshot } from "./modules/snapshot";
 
 const testFace = fs.readFileSync(path.resolve(__dirname, "../test/face.png"));
 const testBody = fs.readFileSync(path.resolve(__dirname, "../test/body.png"));
@@ -16,14 +17,19 @@ const s3 = new S3Client(aws);
 const queue = new Queue(sqs, config.QUEUE_NAME);
 const cache = Math.round(config.INTERVAL / 1000);
 const bucket = new Bucket(s3, config.BUCKET_NAME, cache);
+const snapshot = new Snapshot();
 
 async function job() {
-  const didHandle = await queue.receive(async (message) => {
+  const didWork = await queue.receive(async (message) => {
     console.log(`Processing ${message.address}`);
-    await bucket.saveScreenshots(message.address, testFace, testBody);
-    await sleep(500);
+    const face = await snapshot.getFace(message.address);
+    console.log(`Face ✅`);
+    const body = await snapshot.getBody(message.address);
+    console.log(`Body ✅`);
+    await bucket.saveSnapshots(message.address, face, body);
+    console.log(`Saved ✅`);
   }, config.MAX_JOBS);
-  if (!didHandle) {
+  if (!didWork) {
     console.log(`Queue empty`);
     await sleep(config.INTERVAL / 2);
   }

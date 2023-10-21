@@ -7,7 +7,7 @@ export class Bucket {
     public bucketName: string,
     public cache: number
   ) {}
-  async saveScreenshots(address: string, face: Buffer, body: Buffer) {
+  async saveSnapshots(address: string, face: Buffer, body: Buffer) {
     const faceUpload = new Upload({
       client: this.client,
       params: {
