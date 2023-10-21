@@ -13,7 +13,7 @@ export class Snapshot {
     return screenshot;
   }
   async getFace(address: string) {
-    const url = `https://wearable-preview.decentraland.org/?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&zoom=70&offsetY=1.3`;
+    const url = `https://wearable-preview.decentraland.org/?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`;
     const screenshot = await this.browser.takeScreenshot(url, ".is-loaded", {
       width: 512,
       height: 1024 + 512,

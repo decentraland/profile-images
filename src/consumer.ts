@@ -8,9 +8,6 @@ import { sleep } from "./modules/sleep";
 import { Bucket } from "./modules/bucket";
 import { Snapshot } from "./modules/snapshot";
 
-const testFace = fs.readFileSync(path.resolve(__dirname, "../test/face.png"));
-const testBody = fs.readFileSync(path.resolve(__dirname, "../test/body.png"));
-
 const aws = getAWSConfig();
 const sqs = new SQSClient(aws);
 const s3 = new S3Client(aws);
