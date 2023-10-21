@@ -1,0 +1,30 @@
+{
+  "name": "profile-images",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:producer\" \"npm run start:consumer\"",
+    "start:producer": "ts-node ./src/producer --project tsconfig.json",
+    "start:consumer": "ts-node ./src/consumer --project tsconfig.json",
+    "build": "tsc --project tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.429.0",
+    "@aws-sdk/client-sqs": "^3.431.0",
+    "@aws-sdk/lib-storage": "^3.429.0",
+    "@dcl/schemas": "^9.7.0",
+    "@types/node-fetch": "^2.6.7",
+    "chrome-aws-lambda": "^10.1.0",
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^2.7.0",
+    "prettier": "^3.0.3",
+    "puppeteer-core": "^10.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
