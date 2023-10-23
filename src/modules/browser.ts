@@ -37,6 +37,7 @@ export class Browser {
     }
     const buffer = await container.screenshot({
       encoding: "binary",
+      omitBackground: true,
     });
     await page.close();
     return buffer as Buffer;
