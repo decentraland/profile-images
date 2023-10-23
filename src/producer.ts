@@ -19,11 +19,11 @@ async function poll(
       peerUrl,
       lastTimestamp
     );
-    console.log(`${addresses.length} results`);
+    console.log(`Results: ${addresses.length}`);
     for (const address of addresses) {
       const message: QueueMessage = { address };
       await queue.send(message);
-      console.log(address);
+      console.log(`Added to queue: ${address}`);
     }
     await sleep(ms);
     return await poll(peerUrl, ms, timestamp);

@@ -18,7 +18,7 @@ const snapshot = new Snapshot();
 
 async function job() {
   const didWork = await queue.receive(async (message) => {
-    console.log(`New job: ${message.address}`);
+    console.log(`Processing: ${message.address}`);
     console.time("Snapshots");
     const [face, body] = await Promise.all([
       snapshot.getFace(message.address),
