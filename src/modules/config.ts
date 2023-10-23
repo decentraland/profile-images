@@ -3,6 +3,7 @@ dotenv.config();
 
 export const config = {
   PEER_URL: process.env.PEER_URL || "https://peer.decentraland.org",
+  PREVEW_URL: process.env.PEER_URL || "http://localhost:8080",
   INTERVAL: process.env.INTERVAL ? Number(process.env.INTERVAL) : 60_000,
   AWS_REGION: process.env.AWS_REGION || "us-east-1",
   AWS_ENDPOINT: process.env.AWS_ENDPOINT,

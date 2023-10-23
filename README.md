@@ -24,8 +24,8 @@ Now copy the env variables from the example:
 
 - Run `cp .env.example .env`
 
-Finally, start the producer and consumer services
+Finally, start the producer and consumer services and the local preview
 
 - Run `npm start`
 
-If you want, you can start them on separate terminals individually by running `npm run start:producer` and `npm run start:consumer`
+If you want, you can start them on separate terminals individually by running `npm run start:producer`, `npm run start:consumer` and `npm run start:preview`

@@ -18,13 +18,16 @@ const snapshot = new Snapshot();
 
 async function job() {
   const didWork = await queue.receive(async (message) => {
-    console.log(`Processing ${message.address}`);
-    const face = await snapshot.getFace(message.address);
-    console.log(`Face ✅`);
-    const body = await snapshot.getBody(message.address);
-    console.log(`Body ✅`);
+    console.log(`New job: ${message.address}`);
+    console.time("Snapshots");
+    const [face, body] = await Promise.all([
+      snapshot.getFace(message.address),
+      snapshot.getBody(message.address),
+    ]);
+    console.timeEnd("Snapshots");
+    console.time("Upload");
     await bucket.saveSnapshots(message.address, face, body);
-    console.log(`Saved ✅`);
+    console.timeEnd("Upload");
   }, config.MAX_JOBS);
   if (!didWork) {
     console.log(`Queue empty`);

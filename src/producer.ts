@@ -23,7 +23,7 @@ async function poll(
     for (const address of addresses) {
       const message: QueueMessage = { address };
       await queue.send(message);
-      console.log(`${address} sent to the queue`);
+      console.log(address);
     }
     await sleep(ms);
     return await poll(peerUrl, ms, timestamp);
