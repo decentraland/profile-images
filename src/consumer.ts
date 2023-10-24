@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { S3Client } from "@aws-sdk/client-s3";
 import { config, getAWSConfig } from "./modules/config";

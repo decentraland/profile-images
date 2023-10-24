@@ -1,6 +1,5 @@
 import fetch from "node-fetch";
 import { Entity, EntityType, Profile } from "@dcl/schemas";
-import { config } from "./config";
 
 type Delta = Omit<Entity, "metadata"> & { metadata: Profile };
 
