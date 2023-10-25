@@ -7,12 +7,12 @@ export class Bucket {
     public bucketName: string,
     public cache: number
   ) {}
-  async saveSnapshots(address: string, face: Buffer, body: Buffer) {
+  async saveSnapshots(entity: string, face: Buffer, body: Buffer) {
     const faceUpload = new Upload({
       client: this.client,
       params: {
         Bucket: this.bucketName,
-        Key: `addresses/${address}/face.png`,
+        Key: `entities/${entity}/face.png`,
         Body: face,
         ContentType: "image/png",
         CacheControl: `max-age=${this.cache}`,
@@ -23,7 +23,7 @@ export class Bucket {
       client: this.client,
       params: {
         Bucket: this.bucketName,
-        Key: `addresses/${address}/body.png`,
+        Key: `entities/${entity}/body.png`,
         Body: body,
         ContentType: "image/png",
         CacheControl: `max-age=${this.cache}`,
