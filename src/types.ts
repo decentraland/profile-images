@@ -91,6 +91,7 @@ export type Snapshot = {
 
 export type QueueMessage = {
   address: string
+  entity: string
 }
 
 export type QueueWorker = IBaseComponent

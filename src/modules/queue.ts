@@ -25,6 +25,8 @@ export class Queue {
         return false
       }
 
+      const promises: Promise<void>[] = []
+
       for (const Message of Messages) {
         const { MessageId, Body, ReceiptHandle } = Message
         if (!Body) {
@@ -36,25 +38,25 @@ export class Queue {
 
         const message: QueueMessage = JSON.parse(Body)
 
-        try {
-          await handle(message)
-
-          try {
+        console.time(`Total ${message.entity}`)
+        const promise = handle(message)
+          .then(async () => {
             const deleteCommand = new DeleteMessageCommand({
               QueueUrl: config.QUEUE_NAME,
               ReceiptHandle
             })
             await this.client.send(deleteCommand)
-          } catch (error) {
-            console.error(
-              `Could not delete message with MessageId=${MessageId} and ReceiptHandle=${ReceiptHandle}`,
-              error
-            )
-          }
-        } catch (error) {
-          console.error(`Something went wrong processing address=${message.address}`, error)
-        }
+            console.timeEnd(`Total ${message.entity}`)
+          })
+          .catch((reason) => {
+            console.timeEnd(`Total ${message.entity}`)
+            console.log(`Error processing address="${message.address}" and entity="${message.entity}"`, reason)
+          })
+
+        promises.push(promise)
       }
+
+      await Promise.all(promises)
     } catch (error) {
       console.error(`Something went wrong handling messages`, error)
     }

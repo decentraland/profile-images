@@ -16,18 +16,18 @@ export async function createConsumerComponent({
   const queue = new Queue(sqs, queueName)
 
   const handle = async (message: QueueMessage) => {
-    console.log(`Processing: ${message.address}`)
-    console.time('Snapshots')
+    console.log(`Processing: ${message.entity}`)
+
+    console.time(`Snapshots ${message.entity}`)
     const [face, body] = await Promise.all([snapshot.getFace(message.address), snapshot.getBody(message.address)])
-    console.timeEnd('Snapshots')
-    console.time('Upload')
+    console.timeEnd(`Snapshots ${message.entity}`)
 
+    console.time(`Upload ${message.entity}`)
     await Promise.all([
-      storage.store(`addresses/${message.address}/face.png`, face),
-      storage.store(`addresses/${message.address}/body.png`, body)
+      storage.store(`entities/${message.entity}/face.png`, face),
+      storage.store(`entities/${message.entity}/body.png`, body)
     ])
-
-    console.timeEnd('Upload')
+    console.timeEnd(`Upload ${message.entity}`)
   }
 
   async function job() {

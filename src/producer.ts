@@ -1,6 +1,6 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
 import { config, getAWSConfig } from './modules/config'
-import { getAddressesWithChanges } from './modules/peer'
+import { getProfilesWithChanges } from './modules/peer'
 import { sleep } from './modules/sleep'
 import { Queue } from './modules/queue'
 import { QueueMessage } from './types'
@@ -12,12 +12,12 @@ const queue = new Queue(sqs, config.QUEUE_NAME)
 async function poll(peerUrl: string, ms: number, lastTimestamp: number): Promise<void> {
   try {
     console.log(`Polling changes...`)
-    const { addresses, timestamp } = await getAddressesWithChanges(peerUrl, lastTimestamp)
-    console.log(`Results: ${addresses.length}`)
-    for (const address of addresses) {
-      const message: QueueMessage = { address }
+    const { profiles, timestamp } = await getProfilesWithChanges(peerUrl, lastTimestamp)
+    console.log(`Results: ${profiles.length}`)
+    for (const [address, entity] of profiles) {
+      const message: QueueMessage = { address, entity }
       await queue.send(message)
-      console.log(`Added to queue: ${address}`)
+      console.log(`Added to queue address="${address}" and entity="${entity}"`)
     }
     await sleep(ms)
     return await poll(peerUrl, ms, timestamp)
