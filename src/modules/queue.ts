@@ -46,11 +46,12 @@ export class Queue {
               ReceiptHandle
             })
             await this.client.send(deleteCommand)
-            console.timeEnd(`Total ${message.entity}`)
           })
           .catch((reason) => {
-            console.timeEnd(`Total ${message.entity}`)
             console.log(`Error processing address="${message.address}" and entity="${message.entity}"`, reason)
+          })
+          .finally(() => {
+            console.timeEnd(`Total ${message.entity}`)
           })
 
         promises.push(promise)
