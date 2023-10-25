@@ -43,12 +43,22 @@ export class Browser {
       await page.close();
       return buffer as Buffer;
     } catch (error) {
-      this.reset();
+      await this.reset();
       throw error;
     }
   }
 
-  reset() {
+  async close() {
+    const browser = await this.getBrowser();
+    return browser.close();
+  }
+
+  async reset() {
+    try {
+      await this.close();
+    } catch (error) {
+      console.error(`Could not close browser`, error);
+    }
     delete this.browser;
   }
 }
