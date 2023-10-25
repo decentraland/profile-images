@@ -27,6 +27,8 @@ export class Queue {
 
       const promises: Promise<void>[] = []
 
+      let promises: Promise<void>[] = [];
+
       for (const Message of Messages) {
         const { MessageId, Body, ReceiptHandle } = Message
         if (!Body) {
