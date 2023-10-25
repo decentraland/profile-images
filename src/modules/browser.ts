@@ -1,48 +1,48 @@
-import puppeteer, { Browser as PuppeteerBrowser } from "puppeteer";
+import puppeteer, { Browser as PuppeteerBrowser } from 'puppeteer'
 
 export type ViewPort = {
-  width: number;
-  height: number;
-};
+  width: number
+  height: number
+}
 
 export type Clip = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 export class Browser {
-  private browser?: PuppeteerBrowser;
+  private browser?: PuppeteerBrowser
   constructor() {}
   private async getBrowser() {
     if (!this.browser) {
       this.browser = await puppeteer.launch({
-        headless: "new",
-      });
+        headless: 'new'
+      })
     }
-    return this.browser!;
+    return this.browser!
   }
   async takeScreenshot(url: string, selector: string, viewport: ViewPort) {
-    const start = new Date().getTime();
-    const browser = await this.getBrowser();
-    const page = await browser.newPage();
+    const start = new Date().getTime()
+    const browser = await this.getBrowser()
+    const page = await browser.newPage()
     await page.setViewport({
       deviceScaleFactor: 2,
-      ...viewport,
-    });
-    await page.goto(url);
-    const container = await page.waitForSelector(selector);
+      ...viewport
+    })
+    await page.goto(url)
+    const container = await page.waitForSelector(selector)
     if (!container) {
-      throw new Error(`Could not generate screenshot`);
+      throw new Error(`Could not generate screenshot`)
     }
     const buffer = await container.screenshot({
-      encoding: "binary",
-      omitBackground: true,
-    });
-    await page.close();
-    const end = new Date().getTime();
+      encoding: 'binary',
+      omitBackground: true
+    })
+    await page.close()
+    const end = new Date().getTime()
     console.log(`Screenshot for ${url} took ${end - start}ms`)
-    return buffer as Buffer;
+    return buffer as Buffer
   }
 }

@@ -6,7 +6,7 @@ import type {
   ILoggerComponent,
   IMetricsComponent
 } from '@well-known-components/interfaces'
-import { metricDeclarations } from "./metrics";
+import { metricDeclarations } from './metrics'
 
 export type GlobalContext = {
   components: BaseComponents

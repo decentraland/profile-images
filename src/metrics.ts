@@ -3,7 +3,7 @@ import { metricDeclarations as logsMetricsDeclarations } from '@well-known-compo
 
 export const metricDeclarations = {
   ...getDefaultHttpMetrics(),
-  ...logsMetricsDeclarations,
+  ...logsMetricsDeclarations
 }
 
 // type assertions
