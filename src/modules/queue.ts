@@ -8,6 +8,7 @@ import { config } from "./config";
 
 export type QueueMessage = {
   address: string;
+  entity: string;
 };
 
 export class Queue {
@@ -36,6 +37,8 @@ export class Queue {
         return false;
       }
 
+      let promises: Promise<void>[] = [];
+
       for (const Message of Messages) {
         const { MessageId, Body, ReceiptHandle } = Message;
         if (!Body) {
@@ -47,29 +50,28 @@ export class Queue {
 
         const message: QueueMessage = JSON.parse(Body);
 
-        try {
-          await handle(message);
-
-          try {
+        console.time(`Total ${message.entity}`);
+        const promise = handle(message)
+          .then(() => {
             const deleteCommand = new DeleteMessageCommand({
               QueueUrl: config.QUEUE_NAME,
               ReceiptHandle,
             });
-            await this.client.send(deleteCommand);
-          } catch (error) {
-            console.error(
-              `Could not delete message with MessageId=${MessageId} and ReceiptHandle=${ReceiptHandle}`,
-              error
+            this.client.send(deleteCommand);
+            console.timeEnd(`Total ${message.entity}`);
+          })
+          .catch((reason) => {
+            console.timeEnd(`Total ${message.entity}`);
+            console.log(
+              `Error processing address="${message.address}" and entity="${message.entity}"`,
+              reason
             );
-          }
-        } catch (error) {
-          console.error(
-            `Something went wrong processing address=${message.address}`,
-            error
-          );
-          continue;
-        }
+          });
+
+        promises.push(promise);
       }
+
+      await Promise.all(promises);
     } catch (error) {
       console.error(`Something went wrong handling messages`, error);
     }
