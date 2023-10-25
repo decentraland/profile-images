@@ -7,6 +7,7 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
+import { ViewPort } from './adapters/browser'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -14,9 +15,15 @@ export type GlobalContext = {
 
 // components used in every environment
 export type BaseComponents = {
+  awsConfig: AwsConfig
+  browser: Browser
   config: IConfigComponent
+  fetch: IFetchComponent
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  queueWorker: QueueWorker
+  snapshot: Snapshot
+  storage: IStorageComponent
   server: IHttpServerComponent<GlobalContext>
 }
 
@@ -61,3 +68,29 @@ export class NotFoundError extends Error {
 export type StatusResponse = {
   commitHash: string
 }
+
+export type AwsConfig = {
+  region: string
+  credentials: { accessKeyId: string; secretAccessKey: string }
+  endpoint?: string
+  forcePathStyle?: boolean
+}
+
+export type IStorageComponent = {
+  store(key: string, content: Buffer): Promise<void>
+}
+
+export type Browser = {
+  takeScreenshot(url: string, selector: string, viewport: ViewPort): Promise<Buffer>
+}
+
+export type Snapshot = {
+  getBody(address: string): Promise<Buffer>
+  getFace(address: string): Promise<Buffer>
+}
+
+export type QueueMessage = {
+  address: string
+}
+
+export type QueueWorker = IBaseComponent

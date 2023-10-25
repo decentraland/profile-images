@@ -1,31 +1,26 @@
 import puppeteer, { Browser as PuppeteerBrowser } from 'puppeteer'
+import { Browser } from '../types'
 
 export type ViewPort = {
   width: number
   height: number
 }
 
-export type Clip = {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+export function createBrowser(): Browser {
+  let browser: PuppeteerBrowser | undefined
 
-export class Browser {
-  private browser?: PuppeteerBrowser
-  constructor() {}
-  private async getBrowser() {
-    if (!this.browser) {
-      this.browser = await puppeteer.launch({
+  async function getBrowser() {
+    if (!browser) {
+      browser = await puppeteer.launch({
         headless: 'new'
       })
     }
-    return this.browser!
+    return browser!
   }
-  async takeScreenshot(url: string, selector: string, viewport: ViewPort) {
+
+  async function takeScreenshot(url: string, selector: string, viewport: ViewPort) {
     const start = new Date().getTime()
-    const browser = await this.getBrowser()
+    const browser = await getBrowser()
     const page = await browser.newPage()
     await page.setViewport({
       deviceScaleFactor: 2,
@@ -45,4 +40,6 @@ export class Browser {
     console.log(`Screenshot for ${url} took ${end - start}ms`)
     return buffer as Buffer
   }
+
+  return { takeScreenshot }
 }

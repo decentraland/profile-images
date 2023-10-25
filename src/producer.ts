@@ -2,7 +2,8 @@ import { SQSClient } from '@aws-sdk/client-sqs'
 import { config, getAWSConfig } from './modules/config'
 import { getAddressesWithChanges } from './modules/peer'
 import { sleep } from './modules/sleep'
-import { Queue, QueueMessage } from './modules/queue'
+import { Queue } from './modules/queue'
+import { QueueMessage } from './types'
 
 const aws = getAWSConfig()
 const sqs = new SQSClient(aws)

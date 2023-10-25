@@ -1,9 +1,6 @@
-import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs'
+import { DeleteMessageCommand, ReceiveMessageCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs'
 import { config } from './config'
-
-export type QueueMessage = {
-  address: string
-}
+import { QueueMessage } from '../types'
 
 export class Queue {
   constructor(public client: SQSClient, public queueName: string) {}
@@ -56,7 +53,6 @@ export class Queue {
           }
         } catch (error) {
           console.error(`Something went wrong processing address=${message.address}`, error)
-          continue
         }
       }
     } catch (error) {

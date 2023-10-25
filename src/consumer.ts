@@ -1,39 +1,50 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
-import { S3Client } from '@aws-sdk/client-s3'
-import { config, getAWSConfig } from './modules/config'
 import { Queue } from './modules/queue'
 import { sleep } from './modules/sleep'
-import { Bucket } from './modules/bucket'
-import { Snapshot } from './modules/snapshot'
+import { AppComponents, QueueMessage, QueueWorker } from './types'
 
-const aws = getAWSConfig()
-const sqs = new SQSClient(aws)
-const s3 = new S3Client(aws)
-const queue = new Queue(sqs, config.QUEUE_NAME)
-const cache = Math.round(config.INTERVAL / 1000)
-const bucket = new Bucket(s3, config.BUCKET_NAME, cache)
-const snapshot = new Snapshot()
+export async function createConsumerComponent({
+  awsConfig,
+  config,
+  snapshot,
+  storage
+}: Pick<AppComponents, 'awsConfig' | 'config' | 'snapshot' | 'storage'>): Promise<QueueWorker> {
+  const sqs = new SQSClient(awsConfig)
+  const queueName = await config.requireString('QUEUE_NAME')
+  const maxJobs = parseInt(await config.requireString('MAX_JOBS'))
+  const interval = parseInt(await config.requireString('INTERVAL'))
+  const queue = new Queue(sqs, queueName)
 
-async function job() {
-  const didWork = await queue.receive(async (message) => {
+  const handle = async (message: QueueMessage) => {
     console.log(`Processing: ${message.address}`)
     console.time('Snapshots')
     const [face, body] = await Promise.all([snapshot.getFace(message.address), snapshot.getBody(message.address)])
     console.timeEnd('Snapshots')
     console.time('Upload')
-    await bucket.saveSnapshots(message.address, face, body)
+
+    await Promise.all([
+      storage.store(`addresses/${message.address}/face.png`, face),
+      storage.store(`addresses/${message.address}/body.png`, body)
+    ])
+
     console.timeEnd('Upload')
-  }, config.MAX_JOBS)
-  if (!didWork) {
-    console.log(`Queue empty`)
-    await sleep(config.INTERVAL / 2)
   }
-}
 
-async function main() {
-  while (true) {
-    await job()
+  async function job() {
+    console.log('Running jobs')
+    const didWork = await queue.receive(handle, maxJobs)
+    if (!didWork) {
+      console.log(`Queue empty`)
+      await sleep(interval / 2)
+    }
   }
-}
 
-main().catch(console.error)
+  async function start() {
+    console.log('starting consumer')
+    while (true) {
+      await job()
+    }
+  }
+
+  return { start }
+}
