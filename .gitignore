@@ -5,3 +5,4 @@ coverage
 contents
 .env
 yarn-error.log
+.vscode

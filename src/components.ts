@@ -43,7 +43,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const browser = createBrowser()
 
-  const snapshot = createSnapshotComponent({ browser })
+  const snapshot = createSnapshotComponent({ browser, config })
 
   const queueWorker = await createConsumerComponent({
     awsConfig,

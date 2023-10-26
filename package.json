@@ -10,7 +10,6 @@
     "lint:fix": "eslint '**/*.{js,ts}' --fix",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "start:producer": "ts-node ./src/producer --project tsconfig.json",
-    "start:preview": "http-server ./node_modules/@dcl/wearable-preview/static-local",
     "test": "jest --forceExit --detectOpenHandles --verbose",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage --verbose"
   },
@@ -32,9 +31,7 @@
     "@types/node": "^20.8.8",
     "@types/node-fetch": "^2.6.7",
     "@well-known-components/test-helpers": "^1.5.3",
-    "concurrently": "^8.2.2",
     "dotenv": "^16.3.1",
-    "http-server": "^14.1.1",
     "node-fetch": "^2.7.0",
     "puppeteer": "^21.4.1",
     "puppeteer-core": "^21.4.1",
