@@ -24,8 +24,11 @@ Now copy the env variables from the example:
 
 - Run `cp .env.example .env`
 
-Finally, start the producer and consumer services and the local preview
+Finally, start build and start the consumer service
 
-- Run `npm start`
+- Run `yarn start`
+- Run `yarn build`
 
-If you want, you can start them on separate terminals individually by running `npm run start:producer`, `npm run start:consumer` and `npm run start:preview`
+And run the producer service to start adding jobs to the queue
+
+- Run `yarn run start:producer`
