@@ -1,9 +1,16 @@
 import sharp from 'sharp'
 import { AppComponents, Snapshot } from '../types'
 
-export function createSnapshotComponent({ browser }: Pick<AppComponents, 'browser'>): Snapshot {
+export function createSnapshotComponent({ config, browser }: Pick<AppComponents, 'browser' | 'config'>): Snapshot {
+  async function getBaseUrl() {
+    const host = await config.requireString('HTTP_SERVER_HOST')
+    const port = await config.requireString('HTTP_SERVER_PORT')
+    return `http://${host}:${port}/index.html`
+  }
+
   async function getBody(address: string) {
-    const url = `https://wearable-preview.decentraland.org/?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
+    const baseUrl = await getBaseUrl()
+    const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
     return await browser.takeScreenshot(url, '.is-loaded', {
       width: 512,
       height: 1024
@@ -11,7 +18,8 @@ export function createSnapshotComponent({ browser }: Pick<AppComponents, 'browse
   }
 
   async function getFace(address: string) {
-    const url = `https://wearable-preview.decentraland.org/?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
+    const baseUrl = await getBaseUrl()
+    const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
     const screenshot = await browser.takeScreenshot(url, '.is-loaded', {
       width: 512,
       height: 1024 + 512
