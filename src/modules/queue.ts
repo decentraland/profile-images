@@ -1,81 +1,67 @@
-import {
-  DeleteMessageCommand,
-  ReceiveMessageCommand,
-  SQSClient,
-  SendMessageCommand,
-} from "@aws-sdk/client-sqs";
-import { config } from "./config";
-
-export type QueueMessage = {
-  address: string;
-  entity: string;
-};
+import { DeleteMessageCommand, ReceiveMessageCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs'
+import { config } from './config'
+import { QueueMessage } from '../types'
 
 export class Queue {
-  constructor(
-    public client: SQSClient,
-    public queueName: string
-  ) {}
+  constructor(public client: SQSClient, public queueName: string) {}
 
   async send(message: QueueMessage) {
     const sendCommand = new SendMessageCommand({
       QueueUrl: this.queueName,
-      MessageBody: JSON.stringify(message),
-    });
-    await this.client.send(sendCommand);
+      MessageBody: JSON.stringify(message)
+    })
+    await this.client.send(sendCommand)
   }
 
   async receive(handle: (message: QueueMessage) => Promise<void>, max: number) {
     try {
       const receiveCommand = new ReceiveMessageCommand({
         QueueUrl: this.queueName,
-        MaxNumberOfMessages: max,
-      });
-      const { Messages = [] } = await this.client.send(receiveCommand);
+        MaxNumberOfMessages: max
+      })
+      const { Messages = [] } = await this.client.send(receiveCommand)
 
       if (Messages.length === 0) {
-        return false;
+        return false
       }
 
-      let promises: Promise<void>[] = [];
+      const promises: Promise<void>[] = []
 
       for (const Message of Messages) {
-        const { MessageId, Body, ReceiptHandle } = Message;
+        const { MessageId, Body, ReceiptHandle } = Message
         if (!Body) {
           console.warn(
             `Message with MessageId=${MessageId} and ReceiptHandle=${ReceiptHandle} arrived with undefined Body`
-          );
-          continue;
+          )
+          continue
         }
 
-        const message: QueueMessage = JSON.parse(Body);
+        const message: QueueMessage = JSON.parse(Body)
 
-        console.time(`Total ${message.entity}`);
+        console.time(`Total ${message.entity}`)
         const promise = handle(message)
-          .then(() => {
+          .then(async () => {
             const deleteCommand = new DeleteMessageCommand({
               QueueUrl: config.QUEUE_NAME,
-              ReceiptHandle,
-            });
-            this.client.send(deleteCommand);
-            console.timeEnd(`Total ${message.entity}`);
+              ReceiptHandle
+            })
+            await this.client.send(deleteCommand)
           })
           .catch((reason) => {
-            console.timeEnd(`Total ${message.entity}`);
-            console.log(
-              `Error processing address="${message.address}" and entity="${message.entity}"`,
-              reason
-            );
-          });
+            console.log(`Error processing address="${message.address}" and entity="${message.entity}"`, reason)
+          })
+          .finally(() => {
+            console.timeEnd(`Total ${message.entity}`)
+          })
 
-        promises.push(promise);
+        promises.push(promise)
       }
 
-      await Promise.all(promises);
+      await Promise.all(promises)
     } catch (error) {
-      console.error(`Something went wrong handling messages`, error);
+      console.error(`Something went wrong handling messages`, error)
     }
 
-    return true;
+    return true
   }
 }
