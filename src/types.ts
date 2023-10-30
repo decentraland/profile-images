@@ -71,7 +71,7 @@ export type StatusResponse = {
 
 export type AwsConfig = {
   region: string
-  credentials: { accessKeyId: string; secretAccessKey: string }
+  credentials?: { accessKeyId: string; secretAccessKey: string }
   endpoint?: string
   forcePathStyle?: boolean
 }
