@@ -27,8 +27,8 @@ export async function initComponents(): Promise<AppComponents> {
   const awsConfig: AwsConfig = {
     region: await config.requireString('AWS_REGION'),
     credentials: {
-      accessKeyId: await config.requireString('AWS_ACCESS_KEY_ID'),
-      secretAccessKey: await config.requireString('AWS_SECRET_ACCESS_KEY')
+      accessKeyId: (await config.getString('AWS_ACCESS_KEY_ID')) || '',
+      secretAccessKey: (await config.getString('AWS_SECRET_ACCESS_KEY')) || ''
     }
   }
   const awsEndpoint = await config.getString('AWS_ENDPOINT')
