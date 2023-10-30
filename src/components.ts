@@ -36,6 +36,7 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig.endpoint = awsEndpoint
     awsConfig.forcePathStyle = true
   }
+  console.log('awsConfig', awsConfig)
 
   const storage = await createStorageComponent({ awsConfig, config })
 

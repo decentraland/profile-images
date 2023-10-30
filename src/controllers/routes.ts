@@ -12,6 +12,7 @@ export async function setupRouter(_globalContext: GlobalContext): Promise<Router
 
   router.get('/health/live', healthHandler)
   router.get('/status', statusHandler)
+
   // these are necessary for hosting the wearable-preview locally
   router.get('/:file', staticFileHandler)
   router.get('/:folder/:file', staticFileHandler)
