@@ -4,23 +4,33 @@ import { AppComponents, IStorageComponent } from '../types'
 
 export async function createStorageComponent({
   awsConfig,
-  config
-}: Pick<AppComponents, 'awsConfig' | 'config'>): Promise<IStorageComponent> {
+  config,
+  metrics
+}: Pick<AppComponents, 'awsConfig' | 'config' | 'metrics'>): Promise<IStorageComponent> {
   const s3 = new S3Client(awsConfig)
   const bucket = await config.requireString('BUCKET_NAME')
 
   return {
     async store(key: string, content: Buffer): Promise<void> {
-      const upload = new Upload({
-        client: s3,
-        params: {
-          Bucket: bucket,
-          Key: key,
-          Body: content,
-          ContentType: 'image/png'
-        }
-      })
-      await upload.done()
+      const timer = metrics.startTimer('image_upload_duration_seconds')
+      let status = 'success'
+      try {
+        const upload = new Upload({
+          client: s3,
+          params: {
+            Bucket: bucket,
+            Key: key,
+            Body: content,
+            ContentType: 'image/png'
+          }
+        })
+        await upload.done()
+      } catch (e: any) {
+        status = 'error'
+        throw e
+      } finally {
+        timer.end({ status })
+      }
     }
   }
 }

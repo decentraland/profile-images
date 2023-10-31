@@ -43,13 +43,13 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig.forcePathStyle = true
   }
 
-  const storage = await createStorageComponent({ awsConfig, config })
+  const storage = await createStorageComponent({ awsConfig, config, metrics })
 
   const fetch = await createFetchComponent()
 
   const browser = createBrowser()
 
-  const snapshot = createSnapshotComponent({ browser, config })
+  const snapshot = await createSnapshotComponent({ browser, config, metrics })
 
   const profileFetcher = await createProfileFetcher({
     config,
