@@ -27,7 +27,7 @@ export async function createProducerComponent({
   }
 
   async function start() {
-    logger.info('starting producer')
+    logger.info('Starting producer')
     let lastRun = Date.now() - interval
     while (true) {
       try {

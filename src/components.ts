@@ -42,7 +42,6 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig.endpoint = awsEndpoint
     awsConfig.forcePathStyle = true
   }
-  console.log('awsConfig', awsConfig)
 
   const storage = await createStorageComponent({ awsConfig, config })
 
@@ -60,6 +59,7 @@ export async function initComponents(): Promise<AppComponents> {
   const queueWorker = await createConsumerComponent({
     awsConfig,
     config,
+    logs,
     snapshot,
     storage
   })

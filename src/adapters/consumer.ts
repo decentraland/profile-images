@@ -6,9 +6,11 @@ import { AppComponents, QueueMessage, QueueWorker } from '../types'
 export async function createConsumerComponent({
   awsConfig,
   config,
+  logs,
   snapshot,
   storage
-}: Pick<AppComponents, 'awsConfig' | 'config' | 'snapshot' | 'storage'>): Promise<QueueWorker> {
+}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'snapshot' | 'storage'>): Promise<QueueWorker> {
+  const logger = logs.getLogger('consumer')
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
   const maxJobs = parseInt(await config.requireString('MAX_JOBS'))
@@ -16,7 +18,7 @@ export async function createConsumerComponent({
   const queue = new Queue(sqs, queueName)
 
   const handle = async (message: QueueMessage) => {
-    console.log(`Processing: ${message.entity}`)
+    logger.debug(`Processing: ${message.entity}`)
 
     console.time(`Snapshots ${message.entity}`)
     const [face, body] = await Promise.all([snapshot.getFace(message.address), snapshot.getBody(message.address)])
@@ -31,16 +33,16 @@ export async function createConsumerComponent({
   }
 
   async function job() {
-    console.log('Running jobs')
+    logger.debug('Running jobs')
     const didWork = await queue.receive(handle, maxJobs)
     if (!didWork) {
-      console.log(`Queue empty`)
+      logger.debug(`Queue empty`)
       await sleep(interval / 2)
     }
   }
 
   async function start() {
-    console.log('starting consumer')
+    logger.debug('Starting consumer')
     while (true) {
       await job()
     }
