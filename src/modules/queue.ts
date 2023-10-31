@@ -1,6 +1,7 @@
 import { DeleteMessageCommand, ReceiveMessageCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs'
 import { config } from './config'
 import { QueueMessage } from '../types'
+import { sleep } from './sleep'
 
 export class Queue {
   constructor(public client: SQSClient, public queueName: string) {}
@@ -60,6 +61,7 @@ export class Queue {
       await Promise.all(promises)
     } catch (error) {
       console.error(`Something went wrong handling messages`, error)
+      await sleep(10000)
     }
 
     return true
