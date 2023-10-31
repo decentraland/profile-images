@@ -1,5 +1,5 @@
-import fetch from 'node-fetch'
 import { Entity, EntityType, Profile } from '@dcl/schemas'
+import { AppComponents, ProfileFetcher } from '../types'
 
 type Delta = Omit<Entity, 'metadata'> & { metadata: Profile; entityId: string }
 
@@ -17,11 +17,15 @@ type PointerChangesResponse = {
   }
 }
 
-export async function getProfilesWithChanges(peerUrl: string, from: number) {
-  const now = Date.now()
-  const url = `${peerUrl}/content/pointer-changes?entityType=${EntityType.PROFILE}&from=${from}&to=${now}`
-  const response = await fetch(url)
-  if (response.ok) {
+export async function createProfileFetcher({
+  fetch,
+  config
+}: Pick<AppComponents, 'config' | 'fetch'>): Promise<ProfileFetcher> {
+  const peerUrl = await config.requireString('PEER_URL')
+  async function getProfilesWithChanges(from: number) {
+    const now = Date.now()
+    const url = `${peerUrl}/content/pointer-changes?entityType=${EntityType.PROFILE}&from=${from}&to=${now}`
+    const response = await fetch.fetch(url)
     const data: PointerChangesResponse = await response.json()
     const profiles = new Map<string, string>()
     for (const profile of data.deltas) {
@@ -30,8 +34,7 @@ export async function getProfilesWithChanges(peerUrl: string, from: number) {
       }
     }
     return { profiles: Array.from(profiles), timestamp: now }
-  } else {
-    const text = await response.text()
-    throw new Error(`Could not load pointer changes: "${text}"`)
   }
+
+  return { getProfilesWithChanges }
 }

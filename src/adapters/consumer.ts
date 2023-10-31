@@ -1,6 +1,6 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
-import { Queue } from '../modules/queue'
-import { sleep } from '../modules/sleep'
+import { Queue } from '../logic/queue'
+import { sleep } from '../logic/sleep'
 import { AppComponents, QueueMessage, QueueWorker } from '../types'
 
 export async function createConsumerComponent({

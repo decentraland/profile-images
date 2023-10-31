@@ -1,5 +1,4 @@
 import { DeleteMessageCommand, ReceiveMessageCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs'
-import { config } from './config'
 import { QueueMessage } from '../types'
 import { sleep } from './sleep'
 
@@ -43,7 +42,7 @@ export class Queue {
         const promise = handle(message)
           .then(async () => {
             const deleteCommand = new DeleteMessageCommand({
-              QueueUrl: config.QUEUE_NAME,
+              QueueUrl: this.queueName,
               ReceiptHandle
             })
             await this.client.send(deleteCommand)

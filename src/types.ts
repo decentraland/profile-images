@@ -19,8 +19,10 @@ export type BaseComponents = {
   browser: Browser
   config: IConfigComponent
   fetch: IFetchComponent
+  jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  profileFetcher: ProfileFetcher
   queueWorker: QueueWorker
   snapshot: Snapshot
   storage: IStorageComponent
@@ -95,3 +97,8 @@ export type QueueMessage = {
 }
 
 export type QueueWorker = IBaseComponent
+export type JobProducer = IBaseComponent
+
+export type ProfileFetcher = {
+  getProfilesWithChanges(from: number): Promise<{ profiles: Array<[string, string]>; timestamp: number }>
+}

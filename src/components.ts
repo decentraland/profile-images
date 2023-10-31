@@ -9,6 +9,8 @@ import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
+import { createProducerComponent } from './producer'
+import { createProfileFetcher } from './adapters/profile-fetcher'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -50,6 +52,11 @@ export async function initComponents(): Promise<AppComponents> {
 
   const snapshot = createSnapshotComponent({ browser, config })
 
+  const profileFetcher = await createProfileFetcher({
+    config,
+    fetch
+  })
+
   const queueWorker = await createConsumerComponent({
     awsConfig,
     config,
@@ -57,13 +64,22 @@ export async function initComponents(): Promise<AppComponents> {
     storage
   })
 
+  const jobProducer = await createProducerComponent({
+    awsConfig,
+    config,
+    logs,
+    profileFetcher
+  })
+
   return {
     awsConfig,
     browser,
     config,
     fetch,
+    jobProducer,
     logs,
     metrics,
+    profileFetcher,
     queueWorker,
     server,
     snapshot,

@@ -1,35 +1,43 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
-import { config, getAWSConfig } from './modules/config'
-import { getProfilesWithChanges } from './modules/peer'
-import { sleep } from './modules/sleep'
-import { Queue } from './modules/queue'
-import { QueueMessage } from './types'
+import { sleep } from './logic/sleep'
+import { Queue } from './logic/queue'
+import { AppComponents, JobProducer, QueueMessage } from './types'
 
-const aws = getAWSConfig()
-const sqs = new SQSClient(aws)
-const queue = new Queue(sqs, config.QUEUE_NAME)
+export async function createProducerComponent({
+  awsConfig,
+  config,
+  logs,
+  profileFetcher
+}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'profileFetcher'>): Promise<JobProducer> {
+  const logger = logs.getLogger('producer')
+  const sqs = new SQSClient(awsConfig)
+  const queueName = await config.requireString('QUEUE_NAME')
+  const queue = new Queue(sqs, queueName)
+  const interval = parseInt(await config.requireString('INTERVAL'))
 
-async function poll(peerUrl: string, ms: number, lastTimestamp: number): Promise<void> {
-  try {
-    console.log(`Polling changes...`)
-    const { profiles, timestamp } = await getProfilesWithChanges(peerUrl, lastTimestamp)
-    console.log(`Results: ${profiles.length}`)
+  async function poll(ms: number, lastTimestamp: number): Promise<number> {
+    const { profiles, timestamp } = await profileFetcher.getProfilesWithChanges(lastTimestamp)
+    logger.debug(`Got ${profiles.length} profiles with changes`)
     for (const [address, entity] of profiles) {
       const message: QueueMessage = { address, entity }
       await queue.send(message)
-      console.log(`Added to queue address="${address}" and entity="${entity}"`)
+      logger.debug(`Added to queue address="${address}" and entity="${entity}"`)
     }
-    await sleep(ms)
-    return await poll(peerUrl, ms, timestamp)
-  } catch (error) {
-    console.error(error)
-    await sleep(ms)
-    return await poll(peerUrl, ms, lastTimestamp)
+    return timestamp
   }
-}
 
-async function main() {
-  await poll(config.PEER_URL, config.INTERVAL, Date.now() - config.INTERVAL)
-}
+  async function start() {
+    logger.info('starting producer')
+    let lastRun = Date.now() - interval
+    while (true) {
+      try {
+        lastRun = await poll(interval, lastRun)
+      } catch (error: any) {
+        logger.error(error)
+      }
+      await sleep(interval)
+    }
+  }
 
-main().catch(console.error)
+  return { start }
+}
