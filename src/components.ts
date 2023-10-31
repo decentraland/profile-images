@@ -5,7 +5,7 @@ import { createMetricsComponent, instrumentHttpServerWithMetrics } from '@well-k
 import { AppComponents, AwsConfig, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createFetchComponent } from './adapters/fetch'
-import { createConsumerComponent } from './consumer'
+import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
