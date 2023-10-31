@@ -80,6 +80,7 @@ export type AwsConfig = {
 
 export type IStorageComponent = {
   store(key: string, content: Buffer): Promise<void>
+  retrieve(key: string): Promise<Buffer | undefined>
 }
 
 export type Browser = {
@@ -97,7 +98,9 @@ export type QueueMessage = {
 }
 
 export type QueueWorker = IBaseComponent
-export type JobProducer = IBaseComponent
+export type JobProducer = IBaseComponent & {
+  changeLastRun(ts: number): Promise<void>
+}
 
 export type ProfileFetcher = {
   getProfilesWithChanges(from: number): Promise<{ profiles: Array<[string, string]>; timestamp: number }>

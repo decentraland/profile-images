@@ -68,7 +68,8 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig,
     config,
     logs,
-    profileFetcher
+    profileFetcher,
+    storage
   })
 
   return {
