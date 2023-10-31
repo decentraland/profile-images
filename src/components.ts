@@ -9,7 +9,7 @@ import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
-import { createProducerComponent } from './producer'
+import { createProducerComponent } from './adapters/producer'
 import { createProfileFetcher } from './adapters/profile-fetcher'
 
 // Initialize all the components of the app

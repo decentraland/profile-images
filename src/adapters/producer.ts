@@ -1,7 +1,7 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
-import { sleep } from './logic/sleep'
-import { Queue } from './logic/queue'
-import { AppComponents, JobProducer, QueueMessage } from './types'
+import { sleep } from '../logic/sleep'
+import { Queue } from '../logic/queue'
+import { AppComponents, JobProducer, QueueMessage } from '../types'
 
 export async function createProducerComponent({
   awsConfig,
