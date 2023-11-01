@@ -9,12 +9,21 @@ export type ViewPort = {
 export async function createBrowser({ config }: Pick<AppComponents, 'config'>): Promise<Browser> {
   const chromeExecutable = await config.getString('CHROME_EXECUTABLE')
   let browser: PuppeteerBrowser | undefined
+  console.log(`Using chrome executable: ${chromeExecutable}`)
 
   async function getBrowser() {
     if (!browser) {
       browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: chromeExecutable
+        // executablePath: chromeExecutable,
+        args: [
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--no-sandbox'
+          // '--enable-logging',
+          // '--v=1'
+        ]
       })
     }
     return browser!
