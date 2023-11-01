@@ -29,6 +29,8 @@ RUN yarn install --prod --frozen-lockfile
 
 FROM node:slim
 
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
+
 RUN apt-get update && apt-get install tini gnupg wget -y && \
   wget --quiet --output-document=- https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google-archive.gpg && \
   sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
@@ -54,6 +56,6 @@ COPY --from=builderenv /app /app
 # (i.e. SIGTERM) to reach the service
 # Read more here: https://aws.amazon.com/blogs/containers/graceful-shutdowns-with-ecs/
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 # Run the program under Tini
 CMD [ "/usr/local/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
