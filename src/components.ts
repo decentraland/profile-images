@@ -47,7 +47,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetch = await createFetchComponent()
 
-  const browser = createBrowser()
+  const browser = await createBrowser({ config })
 
   const snapshot = await createSnapshotComponent({ browser, config, metrics })
 

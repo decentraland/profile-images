@@ -1,18 +1,20 @@
 import puppeteer, { Browser as PuppeteerBrowser } from 'puppeteer'
-import { Browser } from '../types'
+import { AppComponents, Browser } from '../types'
 
 export type ViewPort = {
   width: number
   height: number
 }
 
-export function createBrowser(): Browser {
+export async function createBrowser({ config }: Pick<AppComponents, 'config'>): Promise<Browser> {
+  const chromeExecutable = await config.getString('CHROME_EXECUTABLE')
   let browser: PuppeteerBrowser | undefined
 
   async function getBrowser() {
     if (!browser) {
       browser = await puppeteer.launch({
-        headless: 'new'
+        headless: 'new',
+        executablePath: chromeExecutable
       })
     }
     return browser!
