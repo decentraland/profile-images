@@ -24,6 +24,7 @@ export async function createSnapshotComponent({
         height: 1024
       })
     } catch (e: any) {
+      console.log(e)
       status = 'error'
       throw e
     } finally {
@@ -43,6 +44,7 @@ export async function createSnapshotComponent({
       })
       return sharp(screenshot).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
     } catch (e: any) {
+      console.log(e)
       status = 'error'
       throw e
     } finally {
