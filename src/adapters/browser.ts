@@ -15,15 +15,16 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
     if (!browser) {
       browser = await puppeteer.launch({
         headless: 'new',
-        // executablePath: chromeExecutable,
+        executablePath: '/usr/bin/google-chrome-stable',
         args: [
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          '--disable-setuid-sandbox',
+          // '--disable-gpu',
+          // '--disable-dev-shm-usage',
+          // '--disable-setuid-sandbox',
           '--no-sandbox'
-          // '--enable-logging',
-          // '--v=1'
-        ]
+        ],
+        env: {
+          DISPLAY: ':10.0'
+        }
       })
     }
     return browser!
@@ -38,11 +39,15 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
         ...viewport
       })
       await page.goto(url)
-      const container = await page.waitForSelector(selector)
-      if (!container) {
-        throw new Error(`Could not generate screenshot`)
-      }
-      const buffer = await container.screenshot({
+      // const container: any = await Promise.race([
+      //   page.waitForSelector('body'),
+      //   new Promise<void>((resolve) => setTimeout(resolve, 10_000))
+      // ])
+      // if (!container) {
+      //   throw new Error(`Could not generate screenshot`)
+      // }
+      await page.waitForNetworkIdle()
+      const buffer = await page.screenshot({
         encoding: 'binary',
         omitBackground: true
       })
