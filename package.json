@@ -11,8 +11,7 @@
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "start:producer": "ts-node ./src/producer --project tsconfig.json",
     "test": "jest --forceExit --detectOpenHandles --verbose",
-    "test:coverage": "jest --forceExit --detectOpenHandles --coverage --verbose",
-    "docker": "docker run quay.io/decentraland/profile-images-worker:4b02ffd96349e41f2b3222cf6af33f7b53138da8"
+    "test:coverage": "jest --forceExit --detectOpenHandles --coverage --verbose"
   },
   "license": "Apache-2.0",
   "dependencies": {
