@@ -26,6 +26,9 @@ export async function initComponents(): Promise<AppComponents> {
 
   const statusChecks = await createStatusCheckComponent({ server, config })
 
+  const secret = await config.getString('SECRET')
+  console.log(secret)
+
   const awsConfig: AwsConfig = {
     region: await config.requireString('AWS_REGION')
   }
