@@ -13,7 +13,7 @@ export async function createConsumerComponent({
   const logger = logs.getLogger('consumer')
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
-  const maxJobs = parseInt(await config.requireString('MAX_JOBS'))
+  const maxJobs = 1 //parseInt(await config.requireString('MAX_JOBS'))
   const interval = parseInt(await config.requireString('INTERVAL'))
   const queue = new Queue(sqs, queueName)
 

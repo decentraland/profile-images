@@ -6,19 +6,14 @@ export type ViewPort = {
   height: number
 }
 
-export async function createBrowser({ config }: Pick<AppComponents, 'config'>): Promise<Browser> {
-  const chromeExecutable = await config.getString('CHROME_EXECUTABLE')
+export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<Browser> {
   let browser: PuppeteerBrowser | undefined
-  console.log(`Using chrome executable: ${chromeExecutable}`)
 
   async function getBrowser() {
     if (!browser) {
       browser = await puppeteer.launch({
         headless: 'new',
-        // executablePath: '/usr/bin/google-chrome-stable',
-        userDataDir: '/dev/null',
         args: [
-          // '--disable-gpu',
           '--webgl',
           '--disable-dev-shm-usage',
           '--disable-setuid-sandbox',
@@ -38,13 +33,6 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
         deviceScaleFactor: 2,
         ...viewport
       })
-      // await page.setViewport({
-      //   deviceScaleFactor: 1,
-      //   ...viewport,
-      //   width: 1024,
-      //   height: 16384
-      // })
-      // await page.goto('chrome://gpu/')
       await page.goto(url)
       await page.waitForNetworkIdle({ timeout: 10_000 })
       // await page.waitForSelector(selector, { timeout: 10_000 }).catch((_e) => console.log)
