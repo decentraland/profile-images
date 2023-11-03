@@ -15,16 +15,15 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
     if (!browser) {
       browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/usr/bin/google-chrome-stable',
+        // executablePath: '/usr/bin/google-chrome-stable',
         args: [
           // '--disable-gpu',
-          // '--disable-dev-shm-usage',
-          // '--disable-setuid-sandbox',
-          '--no-sandbox'
-        ],
-        env: {
-          DISPLAY: ':10.0'
-        }
+          '--webgl',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--no-sandbox',
+          '--enable-webgl-draft-extensions'
+        ]
       })
     }
     return browser!
@@ -38,15 +37,19 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
         deviceScaleFactor: 2,
         ...viewport
       })
+      // await page.setViewport({
+      //   deviceScaleFactor: 1,
+      //   ...viewport,
+      //   width: 1024,
+      //   height: 16384
+      // })
+      // await page.goto('chrome://gpu/')
       await page.goto(url)
-      // const container: any = await Promise.race([
-      //   page.waitForSelector('body'),
-      //   new Promise<void>((resolve) => setTimeout(resolve, 10_000))
-      // ])
+      await page.waitForNetworkIdle({ timeout: 10_000 })
+      // await page.waitForSelector(selector, { timeout: 10_000 }).catch((_e) => console.log)
       // if (!container) {
       //   throw new Error(`Could not generate screenshot`)
       // }
-      await page.waitForNetworkIdle()
       const buffer = await page.screenshot({
         encoding: 'binary',
         omitBackground: true

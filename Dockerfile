@@ -8,7 +8,7 @@ FROM ubuntu:23.10
 ENV NODE_ENV production
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
+#ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 
 WORKDIR /app
 
@@ -18,22 +18,16 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get update && \
   DEBIAN_FRONTEND=noninteractive \
   apt-get install -y \
-  npm \
-  xorg \
-  xserver-xorg \
+  xorg xserver-xorg \
   xvfb \
-  libx11-dev \
-  libxext-dev \
-  nodejs \
-  chromium-browser
+  libx11-dev libxext-dev libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libpango-1.0-0 libcairo2 libasound2 \
+  nodejs npm
 
 RUN npm install -g yarn
 
 COPY package.json /app/package.json
 COPY yarn.lock /app/yarn.lock
 RUN yarn install --frozen-lockfile
-
-RUN apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libpango-1.0-0 libcairo2 libasound2
 
 
 # build the app
