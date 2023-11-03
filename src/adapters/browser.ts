@@ -16,6 +16,7 @@ export async function createBrowser({ config }: Pick<AppComponents, 'config'>): 
       browser = await puppeteer.launch({
         headless: 'new',
         // executablePath: '/usr/bin/google-chrome-stable',
+        userDataDir: '/dev/null',
         args: [
           // '--disable-gpu',
           '--webgl',
