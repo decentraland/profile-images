@@ -1,5 +1,4 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
-import { sleep } from '../logic/sleep'
 import { Queue } from '../logic/queue'
 import { AppComponents, JobProducer, QueueMessage } from '../types'
 
@@ -47,15 +46,17 @@ export async function createProducerComponent({
     }
     logger.info(`Starting from ${lastRun}.`)
 
-    while (true) {
-      try {
-        lastRun = await poll(interval, lastRun)
-        await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()))
-      } catch (error: any) {
-        logger.error(error)
-      }
-      await sleep(interval)
-    }
+    console.log(poll)
+
+    // while (true) {
+    //   try {
+    //     lastRun = await poll(interval, lastRun)
+    //     await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()))
+    //   } catch (error: any) {
+    //     logger.error(error)
+    //   }
+    //   await sleep(interval)
+    // }
   }
 
   return { start, changeLastRun }
