@@ -38,5 +38,12 @@
     "@well-known-components/test-helpers": "^1.5.3",
     "ts-node": "^10.9.1",
     "typescript": "~5.0.4"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "none",
+    "tabWidth": 2
   }
 }
