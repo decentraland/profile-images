@@ -26,11 +26,11 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
   }
 
   async function takeScreenshot(url: string, selector: string, viewport: ViewPort) {
+    // page.on('console', (msg) => console.log('PAGE LOG:', msg.text()))
+
     try {
       const browser = await getBrowser()
       const page = await browser.newPage()
-
-      page.on('console', (msg) => console.log('PAGE LOG:', msg.text()))
 
       await page.setViewport({
         deviceScaleFactor: 2,
@@ -39,7 +39,10 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
       await page.goto(url)
       // await page.waitForNetworkIdle({ timeout: 20_000 })
       // await sleep({ timeout: 20_000 })
-      await page.waitForSelector(selector, { timeout: 30_000 })
+      const container = await page.waitForSelector(selector, { timeout: 30_000 })
+      if (!container) {
+        throw new Error('Cannot resolve selected element')
+      }
       // if (!container) {
       //   throw new Error(`Could not generate screenshot`)
       // }

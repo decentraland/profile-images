@@ -14,7 +14,7 @@ export async function createConsumerComponent({
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
   const maxJobs = 1 //parseInt(await config.requireString('MAX_JOBS'))
-  const interval = parseInt(await config.requireString('INTERVAL'))
+  const interval = await config.requireNumber('INTERVAL')
   const queue = new Queue(sqs, queueName)
 
   const handle = async (message: QueueMessage) => {
