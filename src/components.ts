@@ -7,7 +7,6 @@ import { metricDeclarations } from './metrics'
 import { createFetchComponent } from './adapters/fetch'
 import { createConsumerComponent } from './consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
 
 // Initialize all the components of the app
@@ -41,9 +40,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetch = await createFetchComponent()
 
-  const browser = createBrowser()
-
-  const snapshot = createSnapshotComponent({ browser, config })
+  const snapshot = createSnapshotComponent({ config })
 
   const queueWorker = await createConsumerComponent({
     awsConfig,
@@ -54,7 +51,6 @@ export async function initComponents(): Promise<AppComponents> {
 
   return {
     awsConfig,
-    browser,
     config,
     fetch,
     logs,

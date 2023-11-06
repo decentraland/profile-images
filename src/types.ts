@@ -7,7 +7,6 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
-import { ViewPort } from './adapters/browser'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -16,7 +15,6 @@ export type GlobalContext = {
 // components used in every environment
 export type BaseComponents = {
   awsConfig: AwsConfig
-  browser: Browser
   config: IConfigComponent
   fetch: IFetchComponent
   logs: ILoggerComponent
@@ -80,13 +78,8 @@ export type IStorageComponent = {
   store(key: string, content: Buffer): Promise<void>
 }
 
-export type Browser = {
-  takeScreenshot(url: string, selector: string, viewport: ViewPort): Promise<Buffer>
-}
-
 export type Snapshot = {
-  getBody(address: string): Promise<Buffer>
-  getFace(address: string): Promise<Buffer>
+  takeScreenshots(address: string): Promise<[Buffer, Buffer]>
 }
 
 export type QueueMessage = {

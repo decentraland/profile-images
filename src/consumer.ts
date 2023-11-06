@@ -19,7 +19,7 @@ export async function createConsumerComponent({
     console.log(`Processing: ${message.entity}`)
 
     console.time(`Snapshots ${message.entity}`)
-    const [face, body] = await Promise.all([snapshot.getFace(message.address), snapshot.getBody(message.address)])
+    const [body, face] = await snapshot.takeScreenshots(message.address)
     console.timeEnd(`Snapshots ${message.entity}`)
 
     console.time(`Upload ${message.entity}`)
