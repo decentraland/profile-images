@@ -29,12 +29,15 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
     try {
       const browser = await getBrowser()
       const page = await browser.newPage()
+
+      page.on('console', (msg) => console.log('PAGE LOG:', msg.text()))
+
       await page.setViewport({
         deviceScaleFactor: 2,
         ...viewport
       })
       await page.goto(url)
-      await page.waitForNetworkIdle({ timeout: 10_000 })
+      await page.waitForNetworkIdle({ timeout: 20_000 })
       // await page.waitForSelector(selector, { timeout: 10_000 }).catch((_e) => console.log)
       // if (!container) {
       //   throw new Error(`Could not generate screenshot`)
@@ -47,6 +50,7 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
 
       return buffer as Buffer
     } catch (error) {
+      console.error(error)
       await reset()
       throw error
     }
