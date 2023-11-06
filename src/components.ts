@@ -7,7 +7,6 @@ import { metricDeclarations } from './metrics'
 import { createFetchComponent } from './adapters/fetch'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
 import { createProducerComponent } from './adapters/producer'
 import { createProfileFetcher } from './adapters/profile-fetcher'
@@ -25,9 +24,6 @@ export async function initComponents(): Promise<AppComponents> {
   await instrumentHttpServerWithMetrics({ metrics, server, config })
 
   const statusChecks = await createStatusCheckComponent({ server, config })
-
-  const secret = await config.getString('SECRET')
-  console.log(secret)
 
   const awsConfig: AwsConfig = {
     region: await config.requireString('AWS_REGION')
@@ -50,9 +46,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetch = await createFetchComponent()
 
-  const browser = await createBrowser({ config })
-
-  const snapshot = await createSnapshotComponent({ browser, config, metrics })
+  const snapshot = await createSnapshotComponent({ config, metrics })
 
   const profileFetcher = await createProfileFetcher({
     config,
@@ -77,7 +71,6 @@ export async function initComponents(): Promise<AppComponents> {
 
   return {
     awsConfig,
-    browser,
     config,
     fetch,
     jobProducer,
