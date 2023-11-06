@@ -37,8 +37,9 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
         ...viewport
       })
       await page.goto(url)
-      await page.waitForNetworkIdle({ timeout: 20_000 })
-      // await page.waitForSelector(selector, { timeout: 10_000 }).catch((_e) => console.log)
+      // await page.waitForNetworkIdle({ timeout: 20_000 })
+      // await sleep({ timeout: 20_000 })
+      await page.waitForSelector(selector, { timeout: 30_000 })
       // if (!container) {
       //   throw new Error(`Could not generate screenshot`)
       // }
