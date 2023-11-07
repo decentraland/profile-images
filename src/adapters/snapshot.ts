@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { AppComponents, Snapshot } from '../types'
-import puppeteer, { Browser as PuppeteerBrowser } from 'puppeteer'
+import puppeteer, { Browser as PuppeteerBrowser, Page } from 'puppeteer'
 
 export async function createSnapshotComponent({
   config,
@@ -11,6 +11,7 @@ export async function createSnapshotComponent({
   const baseUrl = `http://${host}:${port}/index.html`
 
   let browser: PuppeteerBrowser | undefined
+  let page: Page | undefined
 
   async function getBrowser() {
     if (!browser) {
@@ -25,6 +26,7 @@ export async function createSnapshotComponent({
           '--enable-webgl-draft-extensions'
         ]
       })
+      page = await browser.newPage()
     }
     return browser!
   }
@@ -32,26 +34,27 @@ export async function createSnapshotComponent({
   async function closeBrowser() {
     if (browser) {
       console.log('Closing browser')
+      await page?.close()
       await browser.close()
     }
+    page = undefined
     browser = undefined
   }
 
   async function takeScreenshots(address: string): Promise<[Buffer, Buffer]> {
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
     let status = 'success'
-    const browser = await getBrowser()
+    await getBrowser()
     try {
       // body
       console.time('body')
-      let page = await browser.newPage()
-      await page.setViewport({
+      await page!.setViewport({
         deviceScaleFactor: 2,
         width: 512,
         height: 1024
       })
-      await page.goto(`${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`)
-      let container = await page.waitForSelector('.is-loaded')
+      await page!.goto(`${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`)
+      let container = await page!.waitForSelector('.is-loaded')
       if (!container) {
         throw new Error(`Could not generate screenshot`)
       }
@@ -59,20 +62,18 @@ export async function createSnapshotComponent({
         encoding: 'binary',
         omitBackground: true
       })) as Buffer
-      await page.close()
       console.timeEnd('body')
 
       console.time('face')
-      page = await browser.newPage()
-      await page.setViewport({
+      await page!.setViewport({
         deviceScaleFactor: 2,
         width: 512,
         height: 512 + 1024
       })
-      await page.goto(
+      await page!.goto(
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
       )
-      container = await page.waitForSelector('.is-loaded')
+      container = await page!.waitForSelector('.is-loaded')
       if (!container) {
         throw new Error(`Could not generate screenshot`)
       }
@@ -84,7 +85,6 @@ export async function createSnapshotComponent({
       )
         .extract({ top: 0, left: 0, width: 1024, height: 1024 })
         .toBuffer()
-      await page.close()
       console.timeEnd('face')
 
       return [body, face]
