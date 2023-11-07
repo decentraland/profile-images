@@ -19,7 +19,7 @@ export async function createSnapshotComponent({
       browser = await puppeteer.launch({
         headless: 'new',
         executablePath: browserExecutablePath,
-        args: ['--disable-dev-shm-usage']
+        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox']
       })
       page = await browser.newPage()
       // NOTE: enable this to print console messages
@@ -89,7 +89,6 @@ export async function createSnapshotComponent({
       await page.goto(
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
       )
-      // return sharp(screenshot).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
       const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
       if (!container) {
         throw new Error('Cannot resolve selected element')
