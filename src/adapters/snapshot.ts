@@ -17,8 +17,8 @@ export async function createSnapshotComponent({
       console.log('Launching browser')
       browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/usr/bin/chromium',
-        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox']
+        executablePath: '/usr/bin/google-chrome-stable',
+        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox', '--enable-webgl-draft-extensions']
       })
       console.log('Launching browser: ok')
     }
