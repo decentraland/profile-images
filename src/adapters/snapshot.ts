@@ -1,11 +1,5 @@
-import sharp from 'sharp'
 import { AppComponents, Snapshot } from '../types'
 import puppeteer, { Browser as PuppeteerBrowser, Page } from 'puppeteer'
-
-type ViewPort = {
-  width: number
-  height: number
-}
 
 export async function createSnapshotComponent({
   config,
@@ -35,16 +29,33 @@ export async function createSnapshotComponent({
     return page!
   }
 
-  async function takeScreenshot(url: string, selector: string, viewport: ViewPort) {
+  async function reset() {
+    try {
+      if (browser) {
+        await page?.close()
+        await browser.close()
+      }
+    } catch (error) {
+      console.error(`Could not close browser`, error)
+    }
+    page = undefined
+    browser = undefined
+  }
+
+  async function getBody(address: string) {
+    const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
+    let status = 'success'
     try {
       const page = await getPage()
-
       await page.setViewport({
         deviceScaleFactor: 2,
-        ...viewport
+        width: 512,
+        height: 1024
       })
-      await page.goto(url)
-      const container = await page.waitForSelector(selector, { timeout: 30_000 })
+      await page.goto(
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect&disableDefaultEmotes`
+      )
+      const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
       if (!container) {
         throw new Error('Cannot resolve selected element')
       }
@@ -56,33 +67,9 @@ export async function createSnapshotComponent({
       return buffer as Buffer
     } catch (error) {
       console.error(error)
-      try {
-        if (browser) {
-          await page?.close()
-          await browser.close()
-        }
-      } catch (error) {
-        console.error(`Could not close browser`, error)
-      }
-      page = undefined
-      browser = undefined
-      throw error
-    }
-  }
-
-  async function getBody(address: string) {
-    const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
-    let status = 'success'
-    try {
-      const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
-      return await takeScreenshot(url, '.is-loaded', {
-        width: 512,
-        height: 1024
-      })
-    } catch (e: any) {
-      console.log(e)
       status = 'error'
-      throw e
+      await reset()
+      throw error
     } finally {
       timer.end({ status })
     }
@@ -92,15 +79,37 @@ export async function createSnapshotComponent({
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'face' })
     let status = 'success'
     try {
-      const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
-      const screenshot = await takeScreenshot(url, '.is-loaded', {
+      const page = await getPage()
+      await page.setViewport({
+        deviceScaleFactor: 2,
         width: 512,
         height: 1024 + 512
       })
-      return sharp(screenshot).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
+
+      await page.goto(
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
+      )
+      // return sharp(screenshot).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
+      const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
+      if (!container) {
+        throw new Error('Cannot resolve selected element')
+      }
+      const buffer = await page.screenshot({
+        encoding: 'binary',
+        omitBackground: true,
+        clip: {
+          x: 0,
+          y: 0,
+          width: 512,
+          height: 512
+        }
+      })
+
+      return buffer as Buffer
     } catch (e: any) {
       console.log(e)
       status = 'error'
+      await reset()
       throw e
     } finally {
       timer.end({ status })
