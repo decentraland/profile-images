@@ -34,6 +34,7 @@ WORKDIR /home/pptruser/app
 
 # Make commit hash available to application
 RUN echo "COMMIT_HASH=$COMMIT_HASH" >> .env
+RUN echo "BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable" >> .env
 
 RUN yarn install --prod --frozen-lockfile
 RUN yarn build
