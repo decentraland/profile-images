@@ -1,3 +1,4 @@
+import sharp from 'sharp'
 import { AppComponents, Snapshot } from '../types'
 import puppeteer, { Browser as PuppeteerBrowser, Page } from 'puppeteer'
 
@@ -29,6 +30,14 @@ export async function createSnapshotComponent({
     return page!
   }
 
+  async function loadPreview(page: Page, url: string) {
+    await page.goto(url)
+    const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
+    if (!container) {
+      throw new Error('Cannot resolve selected element')
+    }
+  }
+
   async function reset() {
     try {
       if (browser) {
@@ -52,13 +61,10 @@ export async function createSnapshotComponent({
         width: 512,
         height: 1024
       })
-      await page.goto(
+      await loadPreview(
+        page,
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect&disableDefaultEmotes`
       )
-      const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
-      if (!container) {
-        throw new Error('Cannot resolve selected element')
-      }
       const buffer = await page.screenshot({
         encoding: 'binary',
         omitBackground: true
@@ -86,25 +92,16 @@ export async function createSnapshotComponent({
         height: 1024 + 512
       })
 
-      await page.goto(
+      await loadPreview(
+        page,
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
       )
-      const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
-      if (!container) {
-        throw new Error('Cannot resolve selected element')
-      }
       const buffer = await page.screenshot({
         encoding: 'binary',
-        omitBackground: true,
-        clip: {
-          x: 0,
-          y: 0,
-          width: 512,
-          height: 512
-        }
+        omitBackground: true
       })
 
-      return buffer as Buffer
+      return sharp(buffer).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
     } catch (e: any) {
       console.log(e)
       status = 'error'

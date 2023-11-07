@@ -28,7 +28,8 @@
     "dotenv": "^16.3.1",
     "node-fetch": "^2.7.0",
     "puppeteer": "^21.4.1",
-    "puppeteer-core": "^21.4.1"
+    "puppeteer-core": "^21.4.1",
+    "sharp": "^0.32.6"
   },
   "devDependencies": {
     "@dcl/eslint-config": "^1.1.12",
