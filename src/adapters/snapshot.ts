@@ -19,7 +19,7 @@ export async function createSnapshotComponent({
       browser = await puppeteer.launch({
         headless: 'new',
         executablePath: browserExecutablePath,
-        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox']
+        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox']
       })
       page = await browser.newPage()
       // NOTE: enable this to print console messages
