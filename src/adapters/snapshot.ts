@@ -41,17 +41,16 @@ export async function createSnapshotComponent({
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
     let status = 'success'
     const browser = await getBrowser()
-    const page = await browser.newPage()
     try {
       // body
+      console.time('body')
+      let page = await browser.newPage()
       await page.setViewport({
         deviceScaleFactor: 2,
         width: 512,
         height: 1024
       })
-      const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
-      console.time('body')
-      await page.goto(url)
+      await page.goto(`${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`)
       let container = await page.waitForSelector('.is-loaded')
       if (!container) {
         throw new Error(`Could not generate screenshot`)
@@ -60,24 +59,16 @@ export async function createSnapshotComponent({
         encoding: 'binary',
         omitBackground: true
       })) as Buffer
+      await page.close()
       console.timeEnd('body')
 
-      // face
+      console.time('face')
+      page = await browser.newPage()
       await page.setViewport({
         deviceScaleFactor: 2,
         width: 512,
         height: 512 + 1024
       })
-      // await page.evaluate(() => {
-      //   window.postMessage(
-      //     {
-      //       type: 'update',
-      //       payload: { options: { disableAutoCenter: true, disableDefaultEmotes: true, zoom: 60, offsetY: 1.25 } }
-      //     },
-      //     '*'
-      //   )
-      // })
-      console.time('face')
       await page.goto(
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
       )
@@ -93,10 +84,9 @@ export async function createSnapshotComponent({
       )
         .extract({ top: 0, left: 0, width: 1024, height: 1024 })
         .toBuffer()
+      await page.close()
       console.timeEnd('face')
 
-      // close page
-      await page.close()
       return [body, face]
     } catch (e: any) {
       console.log(e)
