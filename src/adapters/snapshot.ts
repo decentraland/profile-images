@@ -17,14 +17,10 @@ export async function createSnapshotComponent({
       console.log('Launching browser')
       browser = await puppeteer.launch({
         headless: 'new',
-        args: [
-          '--webgl',
-          '--disable-dev-shm-usage',
-          '--disable-setuid-sandbox',
-          '--no-sandbox',
-          '--enable-webgl-draft-extensions'
-        ]
+        executablePath: '/usr/bin/chromium',
+        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox']
       })
+      console.log('Launching browser: ok')
     }
     return browser!
   }
@@ -40,9 +36,9 @@ export async function createSnapshotComponent({
   async function takeScreenshots(address: string): Promise<[Buffer, Buffer]> {
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
     let status = 'success'
-    const browser = await getBrowser()
-    const page = await browser.newPage()
     try {
+      const browser = await getBrowser()
+      const page = await browser.newPage()
       // body
       await page.setViewport({
         deviceScaleFactor: 2,
