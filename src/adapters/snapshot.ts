@@ -14,6 +14,7 @@ export async function createSnapshotComponent({
 
   async function getBrowser() {
     if (!browser) {
+      console.log('Launching browser')
       browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -30,6 +31,7 @@ export async function createSnapshotComponent({
 
   async function closeBrowser() {
     if (browser) {
+      console.log('Closing browser')
       await browser.close()
     }
     browser = undefined
@@ -48,6 +50,7 @@ export async function createSnapshotComponent({
         height: 1024
       })
       const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
+      console.time('body')
       await page.goto(url)
       let container = await page.waitForSelector('.is-loaded')
       if (!container) {
@@ -57,6 +60,7 @@ export async function createSnapshotComponent({
         encoding: 'binary',
         omitBackground: true
       })) as Buffer
+      console.timeEnd('body')
 
       // face
       await page.setViewport({
@@ -64,15 +68,19 @@ export async function createSnapshotComponent({
         width: 512,
         height: 512 + 1024
       })
-      await page.evaluate(() => {
-        window.postMessage(
-          {
-            type: 'update',
-            payload: { options: { disableAutoCenter: true, disableDefaultEmotes: true, zoom: 60, offsetY: 1.25 } }
-          },
-          '*'
-        )
-      })
+      // await page.evaluate(() => {
+      //   window.postMessage(
+      //     {
+      //       type: 'update',
+      //       payload: { options: { disableAutoCenter: true, disableDefaultEmotes: true, zoom: 60, offsetY: 1.25 } }
+      //     },
+      //     '*'
+      //   )
+      // })
+      console.time('face')
+      await page.goto(
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
+      )
       container = await page.waitForSelector('.is-loaded')
       if (!container) {
         throw new Error(`Could not generate screenshot`)
@@ -85,6 +93,7 @@ export async function createSnapshotComponent({
       )
         .extract({ top: 0, left: 0, width: 1024, height: 1024 })
         .toBuffer()
+      console.timeEnd('face')
 
       // close page
       await page.close()
