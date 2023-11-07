@@ -12,17 +12,14 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
 
   async function getBrowser() {
     if (!browser) {
+      console.log('Launching browser')
       browser = await puppeteer.launch({
         headless: 'new',
-        args: [
-          '--webgl',
-          '--disable-dev-shm-usage',
-          '--disable-setuid-sandbox',
-          '--no-sandbox',
-          '--enable-webgl-draft-extensions'
-        ]
+        executablePath: '/usr/bin/google-chrome-stable',
+        args: ['--disable-dev-shm-usage', '--disable-setuid-sandbox', '--no-sandbox']
       })
       page = await browser.newPage()
+      console.log('Launching browser: ok')
     }
     return browser!
   }
