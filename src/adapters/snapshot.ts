@@ -8,16 +8,12 @@ export async function createSnapshotComponent({
 }: Pick<AppComponents, 'browser' | 'config' | 'metrics'>): Promise<Snapshot> {
   const host = await config.requireString('HTTP_SERVER_HOST')
   const port = await config.requireString('HTTP_SERVER_PORT')
-
-  async function getBaseUrl() {
-    return `http://${host}:${port}/index.html`
-  }
+  const baseUrl = `http://${host}:${port}/index.html`
 
   async function getBody(address: string) {
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'body' })
     let status = 'success'
     try {
-      const baseUrl = await getBaseUrl()
       const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`
       return await browser.takeScreenshot(url, '.is-loaded', {
         width: 512,
@@ -36,7 +32,6 @@ export async function createSnapshotComponent({
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'face' })
     let status = 'success'
     try {
-      const baseUrl = await getBaseUrl()
       const url = `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
       const screenshot = await browser.takeScreenshot(url, '.is-loaded', {
         width: 512,

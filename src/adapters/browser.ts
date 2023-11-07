@@ -1,4 +1,4 @@
-import puppeteer, { Browser as PuppeteerBrowser } from 'puppeteer'
+import puppeteer, { Browser as PuppeteerBrowser, Page } from 'puppeteer'
 import { AppComponents, Browser } from '../types'
 
 export type ViewPort = {
@@ -8,6 +8,7 @@ export type ViewPort = {
 
 export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<Browser> {
   let browser: PuppeteerBrowser | undefined
+  let page: Page | undefined
 
   async function getBrowser() {
     if (!browser) {
@@ -21,6 +22,7 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
           '--enable-webgl-draft-extensions'
         ]
       })
+      page = await browser.newPage()
     }
     return browser!
   }
@@ -29,28 +31,26 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
     // page.on('console', (msg) => console.log('PAGE LOG:', msg.text()))
 
     try {
-      const browser = await getBrowser()
-      const page = await browser.newPage()
+      await getBrowser()
 
-      await page.setViewport({
+      await page!.setViewport({
         deviceScaleFactor: 2,
         ...viewport
       })
-      await page.goto(url)
+      await page!.goto(url)
       // await page.waitForNetworkIdle({ timeout: 20_000 })
       // await sleep({ timeout: 20_000 })
-      const container = await page.waitForSelector(selector, { timeout: 30_000 })
+      const container = await page!.waitForSelector(selector, { timeout: 30_000 })
       if (!container) {
         throw new Error('Cannot resolve selected element')
       }
       // if (!container) {
       //   throw new Error(`Could not generate screenshot`)
       // }
-      const buffer = await page.screenshot({
+      const buffer = await page!.screenshot({
         encoding: 'binary',
         omitBackground: true
       })
-      await page.close()
 
       return buffer as Buffer
     } catch (error) {
@@ -61,8 +61,12 @@ export async function createBrowser(_: Pick<AppComponents, 'config'>): Promise<B
   }
 
   async function close() {
-    const browser = await getBrowser()
-    return browser.close()
+    if (browser) {
+      await page?.close()
+      await browser.close()
+    }
+    page = undefined
+    browser = undefined
   }
 
   async function reset() {
