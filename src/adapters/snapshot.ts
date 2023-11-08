@@ -61,10 +61,7 @@ export async function createSnapshotComponent({
         width: 512,
         height: 1024
       })
-      await loadPreview(
-        page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect&disableDefaultEmotes`
-      )
+      await loadPreview(page, `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`)
       const buffer = await page.screenshot({
         encoding: 'binary',
         omitBackground: true
