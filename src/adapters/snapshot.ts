@@ -142,11 +142,6 @@ export async function createSnapshotComponent({
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`,
         'face'
       )
-      await loadPreview(
-        page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes`,
-        'face-no-zoom'
-      )
       console.time('screenshot for face')
       try {
         const buffer = await page.screenshot({
