@@ -71,12 +71,16 @@ export async function createSnapshotComponent({
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`,
         'body'
       )
-      const buffer = await page.screenshot({
-        encoding: 'binary',
-        omitBackground: true
-      })
-
-      return buffer as Buffer
+      console.time('screenshot for body')
+      try {
+        const buffer = await page.screenshot({
+          encoding: 'binary',
+          omitBackground: true
+        })
+        return buffer as Buffer
+      } finally {
+        console.timeEnd('screenshot for body')
+      }
     } catch (error) {
       console.error(error)
       status = 'error'
@@ -103,12 +107,17 @@ export async function createSnapshotComponent({
         `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`,
         'face'
       )
-      const buffer = await page.screenshot({
-        encoding: 'binary',
-        omitBackground: true
-      })
+      console.time('screenshot for face')
+      try {
+        const buffer = await page.screenshot({
+          encoding: 'binary',
+          omitBackground: true
+        })
 
-      return sharp(buffer).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
+        return sharp(buffer).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
+      } finally {
+        console.timeEnd('screenshot for face')
+      }
     } catch (e: any) {
       console.log(e)
       status = 'error'
