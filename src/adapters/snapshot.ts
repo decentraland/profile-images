@@ -32,7 +32,7 @@ export async function createSnapshotComponent({
 
   async function loadPreview(page: Page, url: string) {
     await page.goto(url)
-    const container = await page.waitForSelector('.is-loaded', { timeout: 30_000 })
+    const container = await page.waitForSelector('.is-loaded:not(.has-error)', { timeout: 30_000 })
     if (!container) {
       throw new Error('Cannot resolve selected element')
     }
