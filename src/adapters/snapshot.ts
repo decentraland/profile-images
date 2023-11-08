@@ -1,4 +1,3 @@
-import sharp from 'sharp'
 import { AppComponents, Snapshot } from '../types'
 import puppeteer, { Browser as PuppeteerBrowser, Page } from 'puppeteer'
 
@@ -18,7 +17,7 @@ export async function createSnapshotComponent({
     if (!browser) {
       console.log('Launching browser')
       browser = await puppeteer.launch({
-        headless: 'new',
+        headless: false,
         executablePath: browserExecutablePath,
         args: [
           '--autoplay-policy=user-gesture-required',
@@ -97,9 +96,8 @@ export async function createSnapshotComponent({
     try {
       const page = await getPage()
       await page.setViewport({
-        deviceScaleFactor: 2,
-        width: 512,
-        height: 1024
+        width: 256,
+        height: 512
       })
       await loadPreview(
         page,
@@ -132,14 +130,13 @@ export async function createSnapshotComponent({
     try {
       const page = await getPage()
       await page.setViewport({
-        deviceScaleFactor: 2,
-        width: 512,
-        height: 1024 + 512
+        width: 256,
+        height: 256
       })
 
       await loadPreview(
         page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`,
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&cameraY=0&offsetY=1.73&zoom=100&zoomScale=2`,
         'face'
       )
       console.time('screenshot for face')
@@ -148,8 +145,7 @@ export async function createSnapshotComponent({
           encoding: 'binary',
           omitBackground: true
         })
-
-        return sharp(buffer).extract({ top: 0, left: 0, width: 1024, height: 1024 }).toBuffer()
+        return buffer as Buffer
       } finally {
         console.timeEnd('screenshot for face')
       }
