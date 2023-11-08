@@ -17,7 +17,7 @@ export async function createSnapshotComponent({
     if (!browser) {
       console.log('Launching browser')
       browser = await puppeteer.launch({
-        headless: false,
+        headless: 'new',
         executablePath: browserExecutablePath,
         args: [
           '--autoplay-policy=user-gesture-required',
