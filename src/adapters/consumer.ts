@@ -21,14 +21,20 @@ export async function createConsumerComponent({
     logger.debug(`Processing: ${message.entity}`)
 
     console.time('body')
-    const body = await snapshot.getBody(message.address)
-    await storage.store(`entities/${message.entity}/body.png`, body)
-    console.timeEnd('body')
+    try {
+      const body = await snapshot.getBody(message.address)
+      await storage.store(`entities/${message.entity}/body.png`, body)
+    } finally {
+      console.timeEnd('body')
+    }
 
     console.time('face')
-    const face = await snapshot.getFace(message.address)
-    await storage.store(`entities/${message.entity}/face.png`, face)
-    console.timeEnd('face')
+    try {
+      const face = await snapshot.getFace(message.address)
+      await storage.store(`entities/${message.entity}/face.png`, face)
+    } finally {
+      console.timeEnd('face')
+    }
   }
 
   async function job() {

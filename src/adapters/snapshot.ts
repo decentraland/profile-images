@@ -30,11 +30,16 @@ export async function createSnapshotComponent({
     return page!
   }
 
-  async function loadPreview(page: Page, url: string) {
-    await page.goto(url)
-    const container = await page.waitForSelector('.is-loaded:not(.has-error)', { timeout: 30_000 })
-    if (!container) {
-      throw new Error('Cannot resolve selected element')
+  async function loadPreview(page: Page, url: string, which: string) {
+    try {
+      console.time(`Loading preview (${which})`)
+      await page.goto(url)
+      const container = await page.waitForSelector('.is-loaded:not(.has-error)', { timeout: 30_000 })
+      if (!container) {
+        throw new Error('Cannot resolve selected element')
+      }
+    } finally {
+      console.timeEnd(`Loading preview (${which})`)
     }
   }
 
@@ -61,7 +66,11 @@ export async function createSnapshotComponent({
         width: 512,
         height: 1024
       })
-      await loadPreview(page, `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`)
+      await loadPreview(
+        page,
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`,
+        'body'
+      )
       const buffer = await page.screenshot({
         encoding: 'binary',
         omitBackground: true
@@ -91,7 +100,8 @@ export async function createSnapshotComponent({
 
       await loadPreview(
         page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`
+        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&zoom=60&offsetY=1.25`,
+        'face'
       )
       const buffer = await page.screenshot({
         encoding: 'binary',
