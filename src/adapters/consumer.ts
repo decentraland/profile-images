@@ -20,15 +20,15 @@ export async function createConsumerComponent({
   const handle = async (message: QueueMessage) => {
     logger.debug(`Processing: ${message.entity}`)
 
-    console.time('face')
-    const face = await snapshot.getFace(message.address)
-    await storage.store(`entities/${message.entity}/face.png`, face)
-    console.timeEnd('face')
-
     console.time('body')
     const body = await snapshot.getBody(message.address)
     await storage.store(`entities/${message.entity}/body.png`, body)
     console.timeEnd('body')
+
+    console.time('face')
+    const face = await snapshot.getFace(message.address)
+    await storage.store(`entities/${message.entity}/face.png`, face)
+    console.timeEnd('face')
   }
 
   async function job() {
