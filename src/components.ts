@@ -5,10 +5,11 @@ import { createMetricsComponent, instrumentHttpServerWithMetrics } from '@well-k
 import { AppComponents, AwsConfig, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createFetchComponent } from './adapters/fetch'
-import { createConsumerComponent } from './consumer'
+import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createBrowser } from './adapters/browser'
 import { createSnapshotComponent } from './adapters/snapshot'
+import { createProducerComponent } from './adapters/producer'
+import { createProfileFetcher } from './adapters/profile-fetcher'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -24,9 +25,16 @@ export async function initComponents(): Promise<AppComponents> {
 
   const statusChecks = await createStatusCheckComponent({ server, config })
 
+  const secret = await config.getString('SECRET')
+  console.log(secret)
+
   const awsConfig: AwsConfig = {
-    region: await config.requireString('AWS_REGION'),
-    credentials: {
+    region: await config.requireString('AWS_REGION')
+  }
+  const accessKeyId = await config.getString('AWS_ACCESS_KEY_ID')
+  const secretAccessKey = await config.getString('AWS_SECRET_ACCESS_KEY')
+  if (accessKeyId && secretAccessKey) {
+    awsConfig.credentials = {
       accessKeyId: (await config.getString('AWS_ACCESS_KEY_ID')) || '',
       secretAccessKey: (await config.getString('AWS_SECRET_ACCESS_KEY')) || ''
     }
@@ -37,28 +45,41 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig.forcePathStyle = true
   }
 
-  const storage = await createStorageComponent({ awsConfig, config })
+  const storage = await createStorageComponent({ awsConfig, config, metrics })
 
   const fetch = await createFetchComponent()
 
-  const browser = createBrowser()
+  const snapshot = await createSnapshotComponent({ config, metrics })
 
-  const snapshot = createSnapshotComponent({ browser, config })
+  const profileFetcher = await createProfileFetcher({
+    config,
+    fetch
+  })
 
   const queueWorker = await createConsumerComponent({
     awsConfig,
     config,
+    logs,
     snapshot,
+    storage
+  })
+
+  const jobProducer = await createProducerComponent({
+    awsConfig,
+    config,
+    logs,
+    profileFetcher,
     storage
   })
 
   return {
     awsConfig,
-    browser,
     config,
     fetch,
+    jobProducer,
     logs,
     metrics,
+    profileFetcher,
     queueWorker,
     server,
     snapshot,

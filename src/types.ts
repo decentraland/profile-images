@@ -7,7 +7,6 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
-import { ViewPort } from './adapters/browser'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -16,11 +15,12 @@ export type GlobalContext = {
 // components used in every environment
 export type BaseComponents = {
   awsConfig: AwsConfig
-  browser: Browser
   config: IConfigComponent
   fetch: IFetchComponent
+  jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  profileFetcher: ProfileFetcher
   queueWorker: QueueWorker
   snapshot: Snapshot
   storage: IStorageComponent
@@ -71,17 +71,14 @@ export type StatusResponse = {
 
 export type AwsConfig = {
   region: string
-  credentials: { accessKeyId: string; secretAccessKey: string }
+  credentials?: { accessKeyId: string; secretAccessKey: string }
   endpoint?: string
   forcePathStyle?: boolean
 }
 
 export type IStorageComponent = {
   store(key: string, content: Buffer): Promise<void>
-}
-
-export type Browser = {
-  takeScreenshot(url: string, selector: string, viewport: ViewPort): Promise<Buffer>
+  retrieve(key: string): Promise<Buffer | undefined>
 }
 
 export type Snapshot = {
@@ -95,3 +92,10 @@ export type QueueMessage = {
 }
 
 export type QueueWorker = IBaseComponent
+export type JobProducer = IBaseComponent & {
+  changeLastRun(ts: number): Promise<void>
+}
+
+export type ProfileFetcher = {
+  getProfilesWithChanges(from: number): Promise<{ profiles: Array<[string, string]>; timestamp: number }>
+}
