@@ -8,6 +8,7 @@ export async function createSnapshotComponent({
   const host = await config.requireString('HTTP_SERVER_HOST')
   const port = await config.requireString('HTTP_SERVER_PORT')
   const browserExecutablePath = await config.requireString('BROWSER_EXECUTABLE_PATH')
+  const peerUrl = await config.requireString('PEER_URL')
   const baseUrl = `http://${host}:${port}/index.html`
 
   let browser: PuppeteerBrowser | undefined
@@ -101,7 +102,7 @@ export async function createSnapshotComponent({
       })
       await loadPreview(
         page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`,
+        `${baseUrl}?peerUrl=${peerUrl}&profile=${address}&disableBackground&disableAutoRotate&disableFadeEffect`,
         'body'
       )
       console.time('screenshot for body')
@@ -136,7 +137,7 @@ export async function createSnapshotComponent({
 
       await loadPreview(
         page,
-        `${baseUrl}?profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&cameraY=0&offsetY=1.73&zoom=100&zoomScale=2`,
+        `${baseUrl}?peerUrl=${peerUrl}&profile=${address}&disableBackground&disableAutoRotate&disableAutoCenter&disableFadeEffect&disableDefaultEmotes&cameraY=0&offsetY=1.73&zoom=100&zoomScale=2`,
         'face'
       )
       console.time('screenshot for face')
