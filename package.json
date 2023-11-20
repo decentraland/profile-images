@@ -35,7 +35,7 @@
     "@dcl/eslint-config": "^1.1.12",
     "@types/node": "^20.8.8",
     "@types/node-fetch": "^2.6.7",
-    "@well-known-components/test-helpers": "^1.5.3",
+    "@well-known-components/test-helpers": "^1.5.4",
     "ts-node": "^10.9.1",
     "typescript": "~5.0.4"
   }
