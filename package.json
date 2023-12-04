@@ -19,7 +19,7 @@
     "@aws-sdk/client-sqs": "^3.431.0",
     "@aws-sdk/lib-storage": "^3.429.0",
     "@dcl/schemas": "^9.8.0",
-    "@dcl/wearable-preview": "^1.21.2",
+    "@dcl/wearable-preview": "^1.22.1",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/http-server": "^2.0.0",
     "@well-known-components/interfaces": "^1.4.2",
