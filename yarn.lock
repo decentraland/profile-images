@@ -1163,10 +1163,10 @@
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
 
-"@dcl/wearable-preview@^1.21.2":
-  version "1.21.2"
-  resolved "https://registry.yarnpkg.com/@dcl/wearable-preview/-/wearable-preview-1.21.2.tgz#5d29ecfeccfa16c8d687444f45a7132692bb7e8f"
-  integrity sha512-LjhAd+0TMeMsEY6IlwFCQcIuKCo+qUy5IVcck4CdijU90X2YHEXBRAfGIp/yffqoezv1P2LW0D8bCBv/rZI7Jw==
+"@dcl/wearable-preview@^1.22.1":
+  version "1.22.1"
+  resolved "https://registry.yarnpkg.com/@dcl/wearable-preview/-/wearable-preview-1.22.1.tgz#32828e89daffff1aece5e4ec27fdfb446afe32cb"
+  integrity sha512-K3BLeezLTYLIhO8XFMj/dNJDpBzJvzC0Lj5mIn8qzbiLX/XOzOn4wqVtb8S8efJPn/c3zpC4B/zPF5tVTQtOZA==
 
 "@eslint-community/eslint-utils@^4.2.0":
   version "4.4.0"
