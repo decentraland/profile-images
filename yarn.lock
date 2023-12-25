@@ -1154,10 +1154,10 @@
     eslint-plugin-prettier "^4.2.1"
     prettier "^2.8.8"
 
-"@dcl/schemas@^9.8.0":
-  version "9.8.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-9.8.0.tgz#4fa79af9e6c3fc5de6de26330456f3626e0dca29"
-  integrity sha512-SDolByIyXud4Z2u9qzVcn8q9vC0k6QW07GjFBNEXYn+Xfrg8rP4EVZ4GnzajdoVlVOWEgDwQJ+uy+hXNuWxaYA==
+"@dcl/schemas@^9.10.0":
+  version "9.10.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-9.10.0.tgz#3821787b326a6ecd89005fbeadc70ed1c389a87b"
+  integrity sha512-rpKa+2dAlz56+g/QSKbVaIDQFm1gF9YkZ4UWGwHkAYpcHW6ss1Fk2fBiAW3ONDIvUh6V8Arl6Iitcn3GzOmFzg==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
