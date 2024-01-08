@@ -2,7 +2,7 @@ ARG RUN
 ARG COMMIT_HASH=local
 ARG CURRENT_VERSION=Unknown
 
-FROM node:lts-slim
+FROM ubuntu:22.04
 
 # Install dependencies
 RUN apt-get update -y \
@@ -10,6 +10,13 @@ RUN apt-get update -y \
         xvfb libasound2-dev libudev-dev \
         clang curl pkg-config libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev \
         libssl-dev libx11-dev libgl1-mesa-dev libxext-dev gnupg wget unzip
+
+# Install node
+RUN curl -sL https://deb.nodesource.com/setup_20.x  | bash -
+RUN apt-get -y install nodejs
+
+# Clean apt cache
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 # Download Dcl Godot Explorer
 ARG DCL_GODOT_VERSION="v0.7.0-alpha"
@@ -34,6 +41,7 @@ COPY . /app
 # Make commit hash available to application
 RUN echo "COMMIT_HASH=$COMMIT_HASH" >> .env
 
+RUN npm i --global yarn
 RUN yarn install --prod --frozen-lockfile
 RUN yarn build
 

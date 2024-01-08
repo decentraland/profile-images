@@ -35,6 +35,7 @@ export async function createGodotSnapshotComponent({
   metrics
 }: Pick<AppComponents, 'config' | 'metrics'>): Promise<Godot> {
   const peerUrl = await config.requireString('PEER_URL')
+  console.log('peerUrl', peerUrl)
 
   async function preparePayload(address: string, options: OptionsGenerateAvatars): Promise<GodotAvatarPayload> {
     const response = await fetch(`${peerUrl}/lambdas/profiles/${address}`)
@@ -73,7 +74,9 @@ export async function createGodotSnapshotComponent({
       console.log('godot', 'generateAvatars', addresses, options)
 
       const promises = addresses.map((address) => preparePayload(address, options))
+      console.log('promises', promises.length)
       const payloads: GodotAvatarPayload[] = await Promise.all(promises)
+      console.log('payloads', payloads)
 
       const results: AvatarGenerationResult[] = payloads.map((payload) => {
         return {
@@ -89,9 +92,8 @@ export async function createGodotSnapshotComponent({
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(output))
       const explorerPath = process.env.EXPLORER_PATH || '.'
-      const command = `
-      DISPLAY=:99 ${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}
-    `
+      const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
+      console.log('explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
       const areFilesCreated = (payload: any): boolean => {
         for (const avatar of payload) {
           if (!existsSync(avatar.destPath)) {
@@ -101,7 +103,8 @@ export async function createGodotSnapshotComponent({
         return true
       }
 
-      exec(command, (error, stdout, stderr) => {
+      exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
+        console.log('exec', 'error', error, 'stdout', stdout, 'stderr', stderr)
         if (error) {
           if (!areFilesCreated(payloads)) {
             console.error(error, stderr)
