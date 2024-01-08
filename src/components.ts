@@ -7,9 +7,9 @@ import { metricDeclarations } from './metrics'
 import { createFetchComponent } from './adapters/fetch'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createSnapshotComponent } from './adapters/snapshot'
 import { createProducerComponent } from './adapters/producer'
 import { createProfileFetcher } from './adapters/profile-fetcher'
+import { createGodotSnapshotComponent } from './adapters/godot'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -49,7 +49,10 @@ export async function initComponents(): Promise<AppComponents> {
 
   const fetch = await createFetchComponent()
 
-  const snapshot = await createSnapshotComponent({ config, metrics })
+  const godot = await createGodotSnapshotComponent({
+    config,
+    metrics
+  })
 
   const profileFetcher = await createProfileFetcher({
     config,
@@ -60,7 +63,7 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig,
     config,
     logs,
-    snapshot,
+    godot,
     storage
   })
 
@@ -76,13 +79,13 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig,
     config,
     fetch,
+    godot,
     jobProducer,
     logs,
     metrics,
     profileFetcher,
     queueWorker,
     server,
-    snapshot,
     storage,
     statusChecks
   }

@@ -44,5 +44,5 @@ RUN yarn build
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 #ENTRYPOINT ["/usr/bin/tini", "--"]
 # Run the program under Tini
-#CMD  [ "/usr/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
-ENTRYPOINT  [ "/usr/local/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+CMD [ "/bin/bash", "/app/entrypoint.sh" ]
+#ENTRYPOINT  [ "/usr/local/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]

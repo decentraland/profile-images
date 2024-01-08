@@ -7,9 +7,9 @@ export async function createConsumerComponent({
   awsConfig,
   config,
   logs,
-  snapshot,
+  godot,
   storage
-}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'snapshot' | 'storage'>): Promise<QueueWorker> {
+}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'godot' | 'storage'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
@@ -20,20 +20,15 @@ export async function createConsumerComponent({
   const handle = async (message: QueueMessage) => {
     logger.debug(`Processing: ${message.entity}`)
 
-    console.time('body')
+    console.time('both images')
     try {
-      const body = await snapshot.getBody(message.address)
-      await storage.store(`entities/${message.entity}/body.png`, body)
+      const images = await godot.getImages(message.address)
+      await Promise.all([
+        storage.store(`entities/${message.entity}/body.png`, images.body),
+        storage.store(`entities/${message.entity}/face.png`, images.face)
+      ])
     } finally {
-      console.timeEnd('body')
-    }
-
-    console.time('face')
-    try {
-      const face = await snapshot.getFace(message.address)
-      await storage.store(`entities/${message.entity}/face.png`, face)
-    } finally {
-      console.timeEnd('face')
+      console.timeEnd('both images')
     }
   }
 
