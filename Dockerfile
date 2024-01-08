@@ -4,37 +4,35 @@ ARG CURRENT_VERSION=Unknown
 
 FROM node:lts-slim
 
-# Install latest chrome dev package and fonts to support major charsets (Chinese, Japanese, Arabic, Hebrew, Thai and a few others)
-# Note: this installs the necessary libs to make the bundled version of Chrome that Puppeteer
-# installs, work.
-RUN apt-get update \
-    && apt-get install -y wget gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg \
-    && sh -c 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable libxss1 dbus dbus-x11 \
-      --no-install-recommends \
-    && service dbus start \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r pptruser && useradd -rm -g pptruser -G audio,video pptruser
+# Install dependencies
+RUN apt-get update -y \
+    && apt-get -y install \
+        xvfb libasound2-dev libudev-dev \
+        clang curl pkg-config libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev \
+        libssl-dev libx11-dev libgl1-mesa-dev libxext-dev gnupg wget unzip
 
-USER pptruser
+# Download Dcl Godot Explorer
+ARG DCL_GODOT_VERSION="v0.7.0-alpha"
+ENV EXPLORER_PATH=/explorer
+RUN mkdir -p ${EXPLORER_PATH} \
+    && cd ${EXPLORER_PATH} \
+    && wget -O explorer.zip https://github.com/decentraland/godot-explorer/releases/download/${DCL_GODOT_VERSION}/decentraland-godot-ubuntu-latest.zip \
+    && unzip explorer.zip \
+    && chmod +x decentraland.godot.client.x86_64 \
+    && rm explorer.zip
 
-WORKDIR /home/pptruser
+WORKDIR /app
 
+ENV EXPLORER_PATH=/explorer
 ENV NODE_ENV production
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 
 # build the app
-COPY --chown=pptruser:pptruser . app
-
-WORKDIR /home/pptruser/app
+COPY . /app
 
 # Make commit hash available to application
 RUN echo "COMMIT_HASH=$COMMIT_HASH" >> .env
-RUN echo "BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable" >> .env
 
 RUN yarn install --prod --frozen-lockfile
 RUN yarn build
