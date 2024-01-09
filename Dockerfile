@@ -31,7 +31,6 @@ RUN mkdir -p ${EXPLORER_PATH} \
 WORKDIR /app
 
 ENV EXPLORER_PATH=/explorer
-ENV NODE_ENV production
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
@@ -45,6 +44,7 @@ RUN npm i --global yarn
 RUN yarn --frozen-lockfile
 RUN yarn build
 
+ENV NODE_ENV production
 
 # Please _DO NOT_ use a custom ENTRYPOINT because it may prevent signals
 # (i.e. SIGTERM) to reach the service
