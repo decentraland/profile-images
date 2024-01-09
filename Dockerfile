@@ -42,7 +42,7 @@ COPY . /app
 RUN echo "COMMIT_HASH=$COMMIT_HASH" >> .env
 
 RUN npm i --global yarn
-RUN yarn install --prod --frozen-lockfile
+RUN yarn install --frozen-lockfile
 RUN yarn build
 
 
