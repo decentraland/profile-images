@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, GodotComponent } from '../types'
 
+import { Entity } from '@dcl/schemas'
+
 let executionNumber = 0
 
 type OptionsGenerateAvatars = Partial<{
@@ -47,7 +49,7 @@ export async function createGodotSnapshotComponent({
         method: 'POST',
         body: JSON.stringify({ ids: entities })
       })
-      const profiles: any[] = await response.json()
+      const profiles: Entity[] = await response.json()
 
       const payloads: GodotAvatarPayload[] = []
       const results: AvatarGenerationResult[] = []
