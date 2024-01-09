@@ -22,7 +22,7 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   profileFetcher: ProfileFetcher
   queueWorker: QueueWorker
-  godot: Godot
+  godot: GodotComponent
   storage: IStorageComponent
   server: IHttpServerComponent<GlobalContext>
 }
@@ -86,8 +86,15 @@ export type Images = {
   face: Buffer
 }
 
-export type Godot = {
-  getImages(address: string): Promise<Images>
+export type AvatarGenerationResult = {
+  entity: string
+  status: boolean
+  avatarPath: string
+  facePath: string
+}
+
+export type GodotComponent = {
+  generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
 }
 
 export type QueueMessage = {

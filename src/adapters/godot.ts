@@ -2,8 +2,7 @@ import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
-import { AppComponents, Godot } from '../types'
-import fs from 'fs/promises'
+import { AppComponents, AvatarGenerationResult, GodotComponent } from '../types'
 
 let executionNumber = 0
 
@@ -15,12 +14,8 @@ type OptionsGenerateAvatars = Partial<{
   height: number
 }>
 
-type AvatarGenerationResult = {
-  avatarPath: string
-  facePath: string
-}
-
 type GodotAvatarPayload = {
+  entity: string
   destPath: string
   width: number | undefined
   height: number | undefined
@@ -33,36 +28,13 @@ type GodotAvatarPayload = {
 export async function createGodotSnapshotComponent({
   config,
   metrics
-}: Pick<AppComponents, 'config' | 'metrics'>): Promise<Godot> {
+}: Pick<AppComponents, 'config' | 'metrics'>): Promise<GodotComponent> {
   const peerUrl = await config.requireString('PEER_URL')
-  console.log('peerUrl', peerUrl)
 
-  async function preparePayload(address: string, options: OptionsGenerateAvatars): Promise<GodotAvatarPayload> {
-    const response = await fetch(`${peerUrl}/lambdas/profiles/${address}`)
-    const data = await response.json()
-    const destPath = path.join(options.outputPath ?? '', `${address}.png`)
-    const faceDestPath = path.join(options.outputPath ?? '', `${address}_face.png`)
-    return {
-      destPath,
-      width: options.width,
-      height: options.height,
-      faceDestPath,
-      faceWidth: options.faceWidth,
-      faceHeight: options.faceHeight,
-      avatar: data.avatars[0].avatar
-    }
-  }
-
-  async function generateAvatars(
-    addresses: string[],
-    _options?: OptionsGenerateAvatars
-  ): Promise<AvatarGenerationResult[]> {
-    // default values
-    const options = {
-      ..._options
-    }
-
+  function run(entities: string[], options: OptionsGenerateAvatars): Promise<AvatarGenerationResult[]> {
     return new Promise(async (resolve, reject) => {
+      console.log(`Running godot to process ${entities.length}`)
+      console.log(`Running godot to process JSON.stringify(${entities})`)
       // unique number for temp files
       executionNumber += 1
 
@@ -71,82 +43,91 @@ export async function createGodotSnapshotComponent({
         mkdirSync(options.outputPath)
       }
 
-      console.log('godot', 'generateAvatars', addresses, options)
-
-      const promises = addresses.map((address) => preparePayload(address, options))
-      console.log('promises', promises.length)
-      const payloads: GodotAvatarPayload[] = await Promise.all(promises)
-      console.log('payloads', payloads)
-
-      const results: AvatarGenerationResult[] = payloads.map((payload) => {
-        return {
-          avatarPath: payload.destPath,
-          facePath: payload.faceDestPath
-        }
+      const response = await fetch(`${peerUrl}/content/entities/active`, {
+        method: 'POST',
+        body: JSON.stringify({ ids: entities })
       })
+      const profiles: any[] = await response.json()
+
+      const payloads: GodotAvatarPayload[] = []
+      const results: AvatarGenerationResult[] = []
+
+      for (const entity of entities) {
+        const profile = profiles.find((p) => p.id === entity)
+        const destPath = path.join(options.outputPath ?? '', `${entity}.png`)
+        const faceDestPath = path.join(options.outputPath ?? '', `${entity}_face.png`)
+        if (profile) {
+          payloads.push({
+            entity,
+            destPath,
+            width: options.width,
+            height: options.height,
+            faceDestPath,
+            faceWidth: options.faceWidth,
+            faceHeight: options.faceHeight,
+            avatar: profile.metadata.avatars[0].avatar
+          })
+        }
+        results.push({
+          status: false,
+          entity,
+          avatarPath: destPath,
+          facePath: faceDestPath
+        })
+      }
 
       const output = {
         baseUrl: `${peerUrl}/content`,
         payload: payloads
       }
+
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(output))
       const explorerPath = process.env.EXPLORER_PATH || '.'
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       console.log('explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
-      const areFilesCreated = (payload: any): boolean => {
-        for (const avatar of payload) {
-          if (!existsSync(avatar.destPath)) {
-            return false
+
+      const checkFilesCreated = (): void => {
+        for (const result of results) {
+          if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
+            result.status = true
           }
         }
-        return true
       }
 
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         console.log('exec', 'error', error, 'stdout', stdout, 'stderr', stderr)
-        if (error) {
-          if (!areFilesCreated(payloads)) {
-            console.error(error, stderr)
-            reject(error)
-          }
-        }
-        if (stderr) {
-          if (!areFilesCreated(payloads)) {
-            console.error(stderr)
-            reject(error)
-          }
-        }
         rmSync(avatarDataPath)
+
+        if (error) {
+          // console.error(error, stderr)
+          return reject(error)
+        }
+
+        checkFilesCreated()
         resolve(results)
       })
     })
   }
 
-  async function getImages(address: string) {
+  async function generateImages(entities: string[]): Promise<AvatarGenerationResult[]> {
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'both' })
     let status = 'success'
     try {
-      console.time('screenshot for both')
+      console.time('screenshots ')
       try {
-        const results = await generateAvatars([address], {
+        return await run(entities, {
           outputPath: 'output',
           width: 256,
           height: 512,
           faceWidth: 256,
           faceHeight: 256
         })
-
-        const [body, face] = await Promise.all([fs.readFile(results[0].avatarPath), fs.readFile(results[0].facePath)])
-        return {
-          body,
-          face
-        }
       } finally {
-        console.timeEnd('screenshot for both')
+        console.timeEnd('screenshots')
       }
     } catch (error) {
-      console.error(error)
+      console.error('process execution error', error)
       status = 'error'
       throw error
     } finally {
@@ -155,6 +136,6 @@ export async function createGodotSnapshotComponent({
   }
 
   return {
-    getImages
+    generateImages
   }
 }

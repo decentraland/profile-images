@@ -6,3 +6,5 @@ contents
 .env
 yarn-error.log
 .vscode
+output
+localstack
