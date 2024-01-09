@@ -8,10 +8,7 @@ import {
 import { QueueMessage } from '../types'
 
 export class Queue {
-  constructor(
-    public client: SQSClient,
-    public queueName: string
-  ) {}
+  constructor(public client: SQSClient, public queueName: string) {}
 
   async send(message: QueueMessage) {
     const sendCommand = new SendMessageCommand({
