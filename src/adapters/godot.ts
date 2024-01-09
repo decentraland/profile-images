@@ -34,7 +34,7 @@ export async function createGodotSnapshotComponent({
   function run(entities: string[], options: OptionsGenerateAvatars): Promise<AvatarGenerationResult[]> {
     return new Promise(async (resolve, reject) => {
       console.log(`Running godot to process ${entities.length}`)
-      console.log(`Running godot to process JSON.stringify(${entities})`)
+      console.log(`Running godot to process ${JSON.stringify(entities)}`)
       // unique number for temp files
       executionNumber += 1
 
@@ -76,6 +76,10 @@ export async function createGodotSnapshotComponent({
         })
       }
 
+      if (payloads.length === 0) {
+        return resolve(results)
+      }
+
       const output = {
         baseUrl: `${peerUrl}/content`,
         payload: payloads
@@ -87,14 +91,6 @@ export async function createGodotSnapshotComponent({
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       console.log('explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
 
-      const checkFilesCreated = (): void => {
-        for (const result of results) {
-          if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-            result.status = true
-          }
-        }
-      }
-
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         console.log('exec', 'error', error, 'stdout', stdout, 'stderr', stderr)
         rmSync(avatarDataPath)
@@ -104,7 +100,12 @@ export async function createGodotSnapshotComponent({
           return reject(error)
         }
 
-        checkFilesCreated()
+        for (const result of results) {
+          if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
+            result.status = true
+          }
+        }
+
         resolve(results)
       })
     })
@@ -114,7 +115,7 @@ export async function createGodotSnapshotComponent({
     const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'both' })
     let status = 'success'
     try {
-      console.time('screenshots ')
+      console.time('screenshots')
       try {
         return await run(entities, {
           outputPath: 'output',
