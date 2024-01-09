@@ -21,7 +21,8 @@ export class Queue {
   async receive(max: number): Promise<Message[]> {
     const receiveCommand = new ReceiveMessageCommand({
       QueueUrl: this.queueName,
-      MaxNumberOfMessages: max
+      MaxNumberOfMessages: max,
+      WaitTimeSeconds: 20
     })
     const { Messages = [] } = await this.client.send(receiveCommand)
 

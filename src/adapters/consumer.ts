@@ -1,6 +1,5 @@
 import { SQSClient } from '@aws-sdk/client-sqs'
 import { Queue } from '../logic/queue'
-import { sleep } from '../logic/sleep'
 import { AppComponents, QueueMessage, QueueWorker } from '../types'
 import fs from 'fs/promises'
 
@@ -15,17 +14,14 @@ export async function createConsumerComponent({
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
   const maxJobs = 10 //parseInt(await config.requireString('MAX_JOBS'))
-  const interval = await config.requireNumber('INTERVAL')
   const queue = new Queue(sqs, queueName)
 
   async function start() {
     logger.debug('Starting consumer')
     while (true) {
-      logger.debug('Running jobs')
       const messages = await queue.receive(maxJobs)
       if (messages.length === 0) {
         logger.debug(`Queue empty`)
-        await sleep(interval / 2)
         continue
       }
 
