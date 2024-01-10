@@ -98,7 +98,6 @@ export type GodotComponent = {
 }
 
 export type QueueMessage = {
-  address: string
   entity: string
 }
 

@@ -24,7 +24,7 @@ export async function createProducerComponent({
     const { profiles, timestamp } = await profileFetcher.getProfilesWithChanges(lastTimestamp)
     logger.debug(`Got ${profiles.length} profiles with changes`)
     for (const [address, entity] of profiles) {
-      const message: QueueMessage = { address, entity }
+      const message: QueueMessage = { entity }
       await queue.send(message)
       logger.debug(`Added to queue address="${address}" and entity="${entity}"`)
     }
