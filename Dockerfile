@@ -2,35 +2,18 @@ ARG RUN
 ARG COMMIT_HASH=local
 ARG CURRENT_VERSION=Unknown
 
-FROM ubuntu:22.04
+FROM quay.io/decentraland/godot-explorer:75dd06e4274470e8c6b7e5f4639985a7825e3d0e
 
-# Install dependencies
-RUN apt-get update -y \
-    && apt-get -y install \
-        xvfb libasound2-dev libudev-dev \
-        clang curl pkg-config libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev \
-        libssl-dev libx11-dev libgl1-mesa-dev libxext-dev gnupg wget unzip
+RUN apt-get install -y ca-certificates
 
 # Install node
-RUN curl -sL https://deb.nodesource.com/setup_20.x  | bash -
-RUN apt-get -y install nodejs
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x  | bash - && apt-get -y install nodejs
 
 # Clean apt cache
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-# Download Dcl Godot Explorer
-ARG DCL_GODOT_VERSION="v0.7.0-alpha"
-ENV EXPLORER_PATH=/explorer
-RUN mkdir -p ${EXPLORER_PATH} \
-    && cd ${EXPLORER_PATH} \
-    && wget -O explorer.zip https://github.com/decentraland/godot-explorer/releases/download/${DCL_GODOT_VERSION}/decentraland-godot-ubuntu-latest.zip \
-    && unzip explorer.zip \
-    && chmod +x decentraland.godot.client.x86_64 \
-    && rm explorer.zip
-
 WORKDIR /app
 
-ENV EXPLORER_PATH=/explorer
 ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
@@ -52,5 +35,5 @@ ENV NODE_ENV production
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 #ENTRYPOINT ["/usr/bin/tini", "--"]
 # Run the program under Tini
-CMD [ "/bin/bash", "/app/entrypoint.sh" ]
+ENTRYPOINT [ "/bin/bash", "/app/entrypoint.sh" ]
 #ENTRYPOINT  [ "/usr/local/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
