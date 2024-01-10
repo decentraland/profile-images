@@ -27,6 +27,37 @@ type GodotAvatarPayload = {
   avatar: any
 }
 
+export function splitUrnAndTokenId(urnReceived: string) {
+  const urnLength = urnReceived.split(':').length
+
+  if (urnLength === 7) {
+    const lastColonIndex = urnReceived.lastIndexOf(':')
+    const urnValue = urnReceived.slice(0, lastColonIndex)
+    return { urn: urnValue, tokenId: urnReceived.slice(lastColonIndex + 1) }
+  } else {
+    return { urn: urnReceived, tokenId: undefined }
+  }
+}
+
+const profileWithAssetUrns = (profile: any) => {
+  return {
+    ...profile,
+    metadata: {
+      ...profile.metadata,
+      avatars: profile.metadata.avatars.map((av: any) => ({
+        ...av,
+        avatar: {
+          ...av.avatar,
+          wearables: av.avatar.wearables.map((wearable: any) => {
+            const { urn } = splitUrnAndTokenId(wearable)
+            return urn
+          })
+        }
+      }))
+    }
+  }
+}
+
 export async function createGodotSnapshotComponent({
   config,
   metrics
@@ -50,22 +81,15 @@ export async function createGodotSnapshotComponent({
           const response = await fetch(`${peerUrl}/content/contents/${entityId}`)
           const profile = await response.json()
 
-          return { id: entityId, ...profile }
+          return profileWithAssetUrns({ id: entityId, ...profile })
         })
       )
-      const profilesWithItemUrls = profiles.map((profile) => {
-        return {
-          ...profile
-        }
-      })
-      console.log('profiles', profiles, profilesWithItemUrls)
 
       const payloads: GodotAvatarPayload[] = []
       const results: AvatarGenerationResult[] = []
 
       for (const entity of entities) {
         const profile = profiles.find((p) => p.id === entity)
-        // console.log('profile', profile)
         const destPath = path.join(options.outputPath ?? '', `${entity}.png`)
         const faceDestPath = path.join(options.outputPath ?? '', `${entity}_face.png`)
         if (profile) {
