@@ -6,8 +6,6 @@ import { AppComponents, AvatarGenerationResult, GodotComponent } from '../types'
 
 import { Entity } from '@dcl/schemas'
 
-let executionNumber = 0
-
 type OptionsGenerateAvatars = Partial<{
   outputPath: string
   faceWidth: number
@@ -60,14 +58,18 @@ const profileWithAssetUrns = (profile: any) => {
 
 export async function createGodotSnapshotComponent({
   config,
+  logs,
   metrics
-}: Pick<AppComponents, 'config' | 'metrics'>): Promise<GodotComponent> {
+}: Pick<AppComponents, 'config' | 'logs' | 'metrics'>): Promise<GodotComponent> {
+  const logger = logs.getLogger('godot-snapshot')
   const peerUrl = await config.requireString('PEER_URL')
   const explorerPath = process.env.EXPLORER_PATH || '.'
 
+  let executionNumber = 0
+
   function run(entities: string[], options: OptionsGenerateAvatars): Promise<AvatarGenerationResult[]> {
     return new Promise(async (resolve, reject) => {
-      console.log(`Running godot to process ${entities.length}: ${JSON.stringify(entities)}`)
+      logger.debug(`Running godot to process ${entities.length}: ${JSON.stringify(entities)}`)
       // unique number for temp files
       executionNumber += 1
 
@@ -120,18 +122,17 @@ export async function createGodotSnapshotComponent({
         baseUrl: `${peerUrl}/content`,
         payload: payloads
       }
-      console.log('output', output.payload)
+      logger.debug(`output: ${JSON.stringify(output)}`)
 
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(output))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      console.log('about to exec', 'explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
+      logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
       exec(command, { timeout: 30_000 }, (error, _stdout, _stderr) => {
         rmSync(avatarDataPath)
 
         if (error) {
-          // console.error(error, stderr)
           return reject(error)
         }
 
@@ -163,7 +164,7 @@ export async function createGodotSnapshotComponent({
         console.timeEnd('screenshots')
       }
     } catch (error) {
-      console.error('process execution error', error)
+      logger.error(`process execution error: ${error}`)
       status = 'error'
       throw error
     } finally {

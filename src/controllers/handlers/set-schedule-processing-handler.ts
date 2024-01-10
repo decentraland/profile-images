@@ -17,7 +17,6 @@ export async function scheduleProcessingHandler(
   const logger = logs.getLogger('schedule-processing-handler')
 
   const body = await request.json()
-  console.log('body', body)
   if (!body || typeof body !== 'object' || !Array.isArray(body)) {
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }

@@ -48,6 +48,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const godot = await createGodotSnapshotComponent({
     config,
+    logs,
     metrics
   })
 
