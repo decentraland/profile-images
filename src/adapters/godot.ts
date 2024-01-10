@@ -32,11 +32,11 @@ export async function createGodotSnapshotComponent({
   metrics
 }: Pick<AppComponents, 'config' | 'metrics'>): Promise<GodotComponent> {
   const peerUrl = await config.requireString('PEER_URL')
+  const explorerPath = process.env.EXPLORER_PATH || '.'
 
   function run(entities: string[], options: OptionsGenerateAvatars): Promise<AvatarGenerationResult[]> {
     return new Promise(async (resolve, reject) => {
-      console.log(`Running godot to process ${entities.length}`)
-      console.log(`Running godot to process ${JSON.stringify(entities)}`)
+      console.log(`Running godot to process ${entities.length}: ${JSON.stringify(entities)}`)
       // unique number for temp files
       executionNumber += 1
 
@@ -45,17 +45,27 @@ export async function createGodotSnapshotComponent({
         mkdirSync(options.outputPath)
       }
 
-      const response = await fetch(`${peerUrl}/content/entities/active`, {
-        method: 'POST',
-        body: JSON.stringify({ ids: entities })
+      const profiles = await Promise.all<Entity>(
+        entities.map(async (entityId) => {
+          const response = await fetch(`${peerUrl}/content/contents/${entityId}`)
+          const profile = await response.json()
+
+          return { id: entityId, ...profile }
+        })
+      )
+      const profilesWithItemUrls = profiles.map((profile) => {
+        return {
+          ...profile
+        }
       })
-      const profiles: Entity[] = await response.json()
+      console.log('profiles', profiles, profilesWithItemUrls)
 
       const payloads: GodotAvatarPayload[] = []
       const results: AvatarGenerationResult[] = []
 
       for (const entity of entities) {
         const profile = profiles.find((p) => p.id === entity)
+        // console.log('profile', profile)
         const destPath = path.join(options.outputPath ?? '', `${entity}.png`)
         const faceDestPath = path.join(options.outputPath ?? '', `${entity}_face.png`)
         if (profile) {
@@ -86,15 +96,14 @@ export async function createGodotSnapshotComponent({
         baseUrl: `${peerUrl}/content`,
         payload: payloads
       }
+      console.log('output', output.payload)
 
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(output))
-      const explorerPath = process.env.EXPLORER_PATH || '.'
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      console.log('explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
+      console.log('about to exec', 'explorerPath', explorerPath, 'display', process.env.DISPLAY, 'command', command)
 
-      exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
-        console.log('exec', 'error', error, 'stdout', stdout, 'stderr', stderr)
+      exec(command, { timeout: 30_000 }, (error, _stdout, _stderr) => {
         rmSync(avatarDataPath)
 
         if (error) {

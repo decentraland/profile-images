@@ -13,7 +13,7 @@ export async function createConsumerComponent({
   const logger = logs.getLogger('consumer')
   const sqs = new SQSClient(awsConfig)
   const queueName = await config.requireString('QUEUE_NAME')
-  const maxJobs = 10 //parseInt(await config.requireString('MAX_JOBS'))
+  const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
   const queue = new Queue(sqs, queueName)
 
   async function start() {
@@ -43,6 +43,7 @@ export async function createConsumerComponent({
       console.time('images')
       try {
         const results = await godot.generateImages(Array.from(receiptByEntity.keys()))
+        console.log('results', results)
 
         for (const { status, entity, avatarPath, facePath } of results) {
           if (status) {
@@ -55,10 +56,16 @@ export async function createConsumerComponent({
               await queue.deleteMessage(receiptByEntity.get(entity)!)
             } catch (err) {
               // TODO: maybe increment retry-count
+              await queue.deleteMessage(receiptByEntity.get(entity)!)
             } finally {
               Promise.all([fs.rm(avatarPath), fs.rm(facePath)]).catch(logger.error)
             }
           }
+        }
+      } catch (_) {
+        logger.warn(`There was a problem processing the batch of ${receiptByEntity.size} profiles.`)
+        for (const [entity] of receiptByEntity) {
+          await queue.deleteMessage(receiptByEntity.get(entity)!)
         }
       } finally {
         console.timeEnd('images')
