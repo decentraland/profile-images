@@ -3,7 +3,6 @@ import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, GodotComponent } from '../types'
-
 import { Entity } from '@dcl/schemas'
 
 type OptionsGenerateAvatars = Partial<{
@@ -59,8 +58,9 @@ const profileWithAssetUrns = (profile: any) => {
 export async function createGodotSnapshotComponent({
   config,
   logs,
-  metrics
-}: Pick<AppComponents, 'config' | 'logs' | 'metrics'>): Promise<GodotComponent> {
+  metrics,
+  fetch
+}: Pick<AppComponents, 'config' | 'logs' | 'metrics' | 'fetch'>): Promise<GodotComponent> {
   const logger = logs.getLogger('godot-snapshot')
   const peerUrl = await config.requireString('PEER_URL')
   const explorerPath = process.env.EXPLORER_PATH || '.'
@@ -78,7 +78,7 @@ export async function createGodotSnapshotComponent({
         mkdirSync(options.outputPath)
       }
 
-      const response = await fetch(`${peerUrl}/content/entities/active`, {
+      const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
         method: 'POST',
         body: JSON.stringify({ ids: entities })
       })
