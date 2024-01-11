@@ -8,3 +8,6 @@ yarn-error.log
 .vscode
 output
 localstack
+compare
+entities
+explorer

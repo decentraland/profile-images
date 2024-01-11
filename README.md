@@ -1,6 +1,6 @@
 ### Profile Images
 
-The profile image services consists of two services: 
+The profile image services consists of two services:
 
 - **Producer**: polls a target catalyst to fetch the latest profiles that have changes, and it adds them as jobs into SQS.
 
@@ -32,3 +32,12 @@ Finally, start build and start the consumer service
 And run the producer service to start adding jobs to the queue
 
 - Run `yarn run start:producer`
+
+## Comparing Images
+
+Generating entities:
+
+```bash
+http https://peer.decentraland.org/content/deployments | jq '.deployments[] | select(.entityType == "profile") | .entityId' | cut -d\" -f2  | sort | uniq > entities
+cat entities  | bin/compare.sh
+```
