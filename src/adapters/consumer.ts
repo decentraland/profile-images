@@ -17,7 +17,6 @@ export async function createConsumerComponent({
     while (true) {
       const messages = await queue.receive(maxJobs)
       if (messages.length === 0) {
-        logger.debug(`Queue empty`)
         continue
       }
 

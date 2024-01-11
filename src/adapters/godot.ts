@@ -76,7 +76,6 @@ export async function createGodotSnapshotComponent({
       }
 
       // logger.debug(`output: ${JSON.stringify(output)}`)
-
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
 
       await writeFile(avatarDataPath, JSON.stringify(input))
@@ -139,13 +138,13 @@ export async function createGodotSnapshotComponent({
     }
 
     logger.debug(`Running godot to process ${payloads.length}: ${JSON.stringify(input)}`)
-
-    const timer = metrics.startTimer('snapshot_generation_duration_seconds', { profiles: payloads.length })
-    console.time(`screenshots for ${payloads.length} entities`)
+    const start = Date.now()
     try {
       await run(input)
-      timer.end({ status: 'success' })
-      console.timeEnd(`screenshots for ${payloads.length} entities`)
+      const duration = Date.now() - start
+
+      metrics.observe('snapshot_generation_duration_seconds', { status: 'ok' }, duration / payloads.length)
+      console.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
       for (const result of results) {
         if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
@@ -155,8 +154,9 @@ export async function createGodotSnapshotComponent({
 
       return results
     } catch (err) {
-      timer.end({ status: 'error' })
-      console.timeEnd(`screenshots for ${payloads.length} entities`)
+      const duration = Date.now() - start
+      metrics.observe('snapshot_generation_duration_seconds', { status: 'error' }, duration / payloads.length)
+      console.log(`screenshots for ${payloads.length} entities: ${duration} ms (failed)`)
       throw err
     }
   }
