@@ -2,7 +2,7 @@ ARG RUN
 ARG COMMIT_HASH=local
 ARG CURRENT_VERSION=Unknown
 
-FROM quay.io/decentraland/godot-explorer:75dd06e4274470e8c6b7e5f4639985a7825e3d0e
+FROM quay.io/decentraland/godot-explorer:c115ad142aebea3c37b025851ce200d620dae207
 
 RUN apt-get install -y ca-certificates
 
