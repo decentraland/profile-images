@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectsCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { AppComponents, IStorageComponent } from '../types'
 
@@ -31,6 +31,18 @@ export async function createStorageComponent({
       } finally {
         timer.end({ status })
       }
+    },
+
+    async deleteMultiple(keys: string[]): Promise<void> {
+      const command = new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: keys.map((key) => ({
+            Key: key
+          }))
+        }
+      })
+      await s3.send(command)
     },
 
     async retrieve(key: string): Promise<Buffer | undefined> {

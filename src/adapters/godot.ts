@@ -50,10 +50,10 @@ const profileWithAssetUrns = (profile: any) => ({
 
 export async function createGodotSnapshotComponent({
   config,
+  fetch,
   logs,
-  metrics,
-  fetch
-}: Pick<AppComponents, 'config' | 'logs' | 'metrics' | 'fetch'>): Promise<GodotComponent> {
+  metrics
+}: Pick<AppComponents, 'config' | 'fetch' | 'logs' | 'metrics'>): Promise<GodotComponent> {
   const logger = logs.getLogger('godot-snapshot')
   const peerUrl = await config.requireString('PEER_URL')
   const explorerPath = process.env.EXPLORER_PATH || '.'
@@ -81,6 +81,7 @@ export async function createGodotSnapshotComponent({
         rmSync(avatarDataPath)
 
         if (error) {
+          logger.warn(`There was a problem processing the batch of ${input.payload.length} profiles.`)
           return reject(error)
         }
 
@@ -146,14 +147,19 @@ export async function createGodotSnapshotComponent({
           result.status = true
         }
       }
-
-      return results
     } catch (err) {
       const duration = Date.now() - start
       metrics.observe('snapshot_generation_duration_seconds', { status: 'error' }, duration / payloads.length)
       console.log(`screenshots for ${payloads.length} entities: ${duration} ms (failed)`)
-      throw err
+
+      for (const result of results) {
+        if (!existsSync(result.avatarPath)) {
+          result.error = `${err}\n`
+        }
+      }
     }
+
+    return results
   }
 
   return {

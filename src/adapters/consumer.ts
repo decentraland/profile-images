@@ -78,12 +78,13 @@ export async function createConsumerComponent({
               await queue.send(message, { delay: 15 })
               logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
             } else {
-              logger.debug(`Giving up on entity="${result.entity} after 5 retries"`)
+              logger.debug(`Giving up on entity="${result.entity} after 5 retries. ${result.error}`)
+              if (result.error) {
+                await storage.store(`failures/${result.entity}.txt`, Buffer.from(result.error))
+              }
             }
           }
         }
-      } catch (_) {
-        logger.warn(`There was a problem processing the batch of ${messageByEntity.size} profiles.`)
       } finally {
         console.timeEnd('generate images + upload to s3')
       }

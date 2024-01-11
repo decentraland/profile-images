@@ -2,11 +2,11 @@ import { HandlerContextWithPath, InvalidRequestError, QueueMessage } from '../..
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'jobProducer' | 'logs' | 'queue' | 'profileFetcher', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'queue' | 'storage', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, queue }
+    components: { logs, queue, storage }
   } = context
 
   const logger = logs.getLogger('schedule-processing-handler')
@@ -16,6 +16,7 @@ export async function scheduleProcessingHandler(
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }
 
+  await storage.deleteMultiple(body.map((entity: string) => `failure/${entity}.txt`))
   for (const entity of body) {
     const message: QueueMessage = { entity, attempt: 0 }
     await queue.send(message)
