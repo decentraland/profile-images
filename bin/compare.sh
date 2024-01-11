@@ -7,13 +7,13 @@ rm -r compare
 mkdir -p compare
 
 while IFS= read -r entity; do
-  wget -q $BUCKET/${entity}/face.png -O compare/${entity}_godot_face.png
+  wget -q $BUCKET/entities/${entity}/face.png -O compare/${entity}_godot_face.png
   if [ $? -eq 8 ]; then
     echo "${entity} is not yet processed"
     rm compare/${entity}_godot_face.png
     continue
   fi
-  wget -q $BUCKET/${entity}/body.png -O compare/${entity}_godot_body.png
+  wget -q $BUCKET/entities/${entity}/body.png -O compare/${entity}_godot_body.png
 
   wget -q $CONTENT/contents/${entity} -O compare/${entity}-profile.json
 

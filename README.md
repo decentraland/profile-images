@@ -39,5 +39,5 @@ Generating entities:
 
 ```bash
 http https://peer.decentraland.org/content/deployments | jq '.deployments[] | select(.entityType == "profile") | .entityId' | cut -d\" -f2  | sort | uniq > entities
-cat entities  | bin/compare.sh
+cat entities | bin/compare.sh
 ```
