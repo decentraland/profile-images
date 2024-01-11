@@ -78,14 +78,11 @@ export async function createGodotSnapshotComponent({
         mkdirSync(options.outputPath)
       }
 
-      const profiles = await Promise.all<Entity>(
-        entities.map(async (entityId) => {
-          const response = await fetch(`${peerUrl}/content/contents/${entityId}`)
-          const profile = await response.json()
-
-          return profileWithAssetUrns({ id: entityId, ...profile })
-        })
-      )
+      const response = await fetch(`${peerUrl}/content/entities/active`, {
+        method: 'POST',
+        body: JSON.stringify({ ids: entities })
+      })
+      const profiles: Entity[] = (await response.json()).map(profileWithAssetUrns)
 
       const payloads: GodotAvatarPayload[] = []
       const results: AvatarGenerationResult[] = []
@@ -122,7 +119,7 @@ export async function createGodotSnapshotComponent({
         baseUrl: `${peerUrl}/content`,
         payload: payloads
       }
-      logger.debug(`output: ${JSON.stringify(output)}`)
+      // logger.debug(`output: ${JSON.stringify(output)}`)
 
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(output))

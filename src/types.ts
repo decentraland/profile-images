@@ -99,6 +99,7 @@ export type GodotComponent = {
 
 export type QueueMessage = {
   entity: string
+  attempt: number
 }
 
 export type QueueWorker = IBaseComponent

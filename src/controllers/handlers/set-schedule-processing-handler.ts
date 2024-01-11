@@ -26,7 +26,7 @@ export async function scheduleProcessingHandler(
   const queue = new Queue(sqs, queueName)
 
   for (const entity of body) {
-    const message: QueueMessage = { entity }
+    const message: QueueMessage = { entity, attempt: 0 }
     await queue.send(message)
     logger.debug(`Added to queue entity="${entity}"`)
   }
