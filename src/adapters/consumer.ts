@@ -43,7 +43,7 @@ export async function createConsumerComponent({
         messageByEntity.set(body.entity, message)
       }
 
-      console.time('images')
+      console.time('generate images + upload to s3')
       try {
         const results = await godot.generateImages(Array.from(messageByEntity.keys()))
         logger.debug(`results: ${JSON.stringify(results)}`)
@@ -86,7 +86,7 @@ export async function createConsumerComponent({
       } catch (_) {
         logger.warn(`There was a problem processing the batch of ${messageByEntity.size} profiles.`)
       } finally {
-        console.timeEnd('images')
+        console.timeEnd('generate images + upload to s3')
       }
     }
   }

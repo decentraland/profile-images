@@ -122,14 +122,19 @@ export async function createGodotSnapshotComponent({
       // logger.debug(`output: ${JSON.stringify(output)}`)
 
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
+
       await writeFile(avatarDataPath, JSON.stringify(output))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
+      const timer = metrics.startTimer('snapshot_generation_duration_seconds', { profiles: payloads.length })
+      console.time(`screenshots for ${entities.length} entities`)
       exec(command, { timeout: 30_000 }, (error, _stdout, _stderr) => {
         rmSync(avatarDataPath)
 
         if (error) {
+          timer.end({ status: 'error' })
+          console.timeEnd(`screenshots for ${entities.length} entities`)
           return reject(error)
         }
 
@@ -139,34 +144,21 @@ export async function createGodotSnapshotComponent({
           }
         }
 
+        console.timeEnd(`screenshots for ${entities.length} entities`)
+        timer.end({ status: 'success' })
         resolve(results)
       })
     })
   }
 
   async function generateImages(entities: string[]): Promise<AvatarGenerationResult[]> {
-    const timer = metrics.startTimer('snapshot_generation_duration_seconds', { image: 'both' })
-    let status = 'success'
-    try {
-      console.time('screenshots')
-      try {
-        return await run(entities, {
-          outputPath: 'output',
-          width: 256,
-          height: 512,
-          faceWidth: 256,
-          faceHeight: 256
-        })
-      } finally {
-        console.timeEnd('screenshots')
-      }
-    } catch (error) {
-      logger.error(`process execution error: ${error}`)
-      status = 'error'
-      throw error
-    } finally {
-      timer.end({ status })
-    }
+    return await run(entities, {
+      outputPath: 'output',
+      width: 256,
+      height: 512,
+      faceWidth: 256,
+      faceHeight: 256
+    })
   }
 
   return {
