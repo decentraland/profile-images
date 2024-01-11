@@ -7,6 +7,7 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
+import { Message } from '@aws-sdk/client-sqs'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -17,14 +18,15 @@ export type BaseComponents = {
   awsConfig: AwsConfig
   config: IConfigComponent
   fetch: IFetchComponent
+  godot: GodotComponent
   jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   profileFetcher: ProfileFetcher
+  queue: QueueService
   queueWorker: QueueWorker
-  godot: GodotComponent
-  storage: IStorageComponent
   server: IHttpServerComponent<GlobalContext>
+  storage: IStorageComponent
 }
 
 // components used in runtime
@@ -95,6 +97,16 @@ export type AvatarGenerationResult = {
 
 export type GodotComponent = {
   generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
+}
+
+export type QueueSendOptions = {
+  delay?: number
+}
+
+export type QueueService = {
+  send(message: QueueMessage, options?: QueueSendOptions): Promise<void>
+  receive(max: number): Promise<Message[]>
+  deleteMessage(receiptHandle: string): Promise<void>
 }
 
 export type QueueMessage = {

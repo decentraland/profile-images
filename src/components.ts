@@ -10,6 +10,7 @@ import { createStorageComponent } from './adapters/storage'
 import { createProducerComponent } from './adapters/producer'
 import { createProfileFetcher } from './adapters/profile-fetcher'
 import { createGodotSnapshotComponent } from './adapters/godot'
+import { createQueueComponent } from './adapters/queue'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -57,19 +58,21 @@ export async function initComponents(): Promise<AppComponents> {
     fetch
   })
 
+  const queue = await createQueueComponent({ awsConfig, config })
+
   const queueWorker = await createConsumerComponent({
-    awsConfig,
     config,
     logs,
     godot,
+    queue,
     storage
   })
 
   const jobProducer = await createProducerComponent({
-    awsConfig,
     config,
     logs,
     profileFetcher,
+    queue,
     storage
   })
 
@@ -82,6 +85,7 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     metrics,
     profileFetcher,
+    queue,
     queueWorker,
     server,
     storage,

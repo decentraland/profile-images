@@ -1,21 +1,16 @@
-import { SQSClient } from '@aws-sdk/client-sqs'
-import { Queue } from '../logic/queue'
 import { AppComponents, JobProducer, QueueMessage } from '../types'
 import { sleep } from '../logic/sleep'
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
 
 export async function createProducerComponent({
-  awsConfig,
   config,
   logs,
   profileFetcher,
+  queue,
   storage
-}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'profileFetcher' | 'storage'>): Promise<JobProducer> {
+}: Pick<AppComponents, 'config' | 'logs' | 'profileFetcher' | 'queue' | 'storage'>): Promise<JobProducer> {
   const logger = logs.getLogger('producer')
-  const sqs = new SQSClient(awsConfig)
-  const queueName = await config.requireString('QUEUE_NAME')
-  const queue = new Queue(sqs, queueName)
   const interval = parseInt(await config.requireString('INTERVAL'))
 
   let lastRun = Date.now() - interval

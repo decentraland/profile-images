@@ -1,20 +1,16 @@
-import { Message, SQSClient } from '@aws-sdk/client-sqs'
-import { Queue } from '../logic/queue'
+import { Message } from '@aws-sdk/client-sqs'
 import { AppComponents, QueueMessage, QueueWorker } from '../types'
 import fs from 'fs/promises'
 
 export async function createConsumerComponent({
-  awsConfig,
   config,
   logs,
   godot,
+  queue,
   storage
-}: Pick<AppComponents, 'awsConfig' | 'config' | 'logs' | 'godot' | 'storage'>): Promise<QueueWorker> {
+}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'queue' | 'storage'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
-  const sqs = new SQSClient(awsConfig)
-  const queueName = await config.requireString('QUEUE_NAME')
   const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
-  const queue = new Queue(sqs, queueName)
 
   async function start() {
     logger.debug('Starting consumer')
@@ -80,7 +76,7 @@ export async function createConsumerComponent({
             const attempts = body.attempt
             if (attempts < 4) {
               const message: QueueMessage = { entity: result.entity, attempt: attempts + 1 }
-              await queue.send(message)
+              await queue.send(message, { delay: 15 })
               logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
             } else {
               logger.debug(`Giving up on entity="${result.entity} after 5 retries"`)
