@@ -34,24 +34,19 @@ const height = 512
 const faceWidth = 256
 const faceHeight = 256
 
-const profileWithAssetUrns = (profile: any) => {
-  return {
-    ...profile,
-    metadata: {
-      ...profile.metadata,
-      avatars: profile.metadata.avatars.map((av: any) => ({
-        ...av,
-        avatar: {
-          ...av.avatar,
-          wearables: av.avatar.wearables.map((wearable: any) => {
-            const { urn } = splitUrnAndTokenId(wearable)
-            return urn
-          })
-        }
-      }))
-    }
+const profileWithAssetUrns = (profile: any) => ({
+  ...profile,
+  metadata: {
+    ...profile.metadata,
+    avatars: profile.metadata.avatars.map((av: any) => ({
+      ...av,
+      avatar: {
+        ...av.avatar,
+        wearables: av.avatar.wearables.map((wearable: any) => splitUrnAndTokenId(wearable).urn)
+      }
+    }))
   }
-}
+})
 
 export async function createGodotSnapshotComponent({
   config,
