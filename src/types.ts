@@ -120,5 +120,5 @@ export type JobProducer = IBaseComponent & {
 }
 
 export type ProfileFetcher = {
-  getProfilesWithChanges(from: number): Promise<{ profiles: Array<[string, string]>; timestamp: number }>
+  getProfilesWithChanges(from: number): Promise<{ entities: string[]; timestamp: number }>
 }

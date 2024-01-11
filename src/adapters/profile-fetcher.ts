@@ -26,6 +26,8 @@ export async function createProfileFetcher({
     const now = Date.now()
     const url = `${peerUrl}/content/pointer-changes?entityType=${EntityType.PROFILE}&from=${from}&to=${now}`
     const response = await fetch.fetch(url)
+
+    // TODO: should be handle pagination here?
     const data: PointerChangesResponse = await response.json()
     const profiles = new Map<string, string>()
     for (const profile of data.deltas) {
@@ -33,7 +35,7 @@ export async function createProfileFetcher({
         profiles.set(address, profile.entityId)
       }
     }
-    return { profiles: Array.from(profiles), timestamp: now }
+    return { entities: Array.from(profiles.values()), timestamp: now }
   }
 
   return { getProfilesWithChanges }

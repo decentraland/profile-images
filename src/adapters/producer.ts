@@ -15,13 +15,13 @@ export async function createProducerComponent({
 
   let lastRun = Date.now() - interval
 
-  async function poll(ms: number, lastTimestamp: number): Promise<number> {
-    const { profiles, timestamp } = await profileFetcher.getProfilesWithChanges(lastTimestamp)
-    logger.debug(`Got ${profiles.length} profiles with changes`)
-    for (const [address, entity] of profiles) {
+  async function poll(lastTimestamp: number): Promise<number> {
+    const { entities, timestamp } = await profileFetcher.getProfilesWithChanges(lastTimestamp)
+    logger.debug(`Got ${entities.length} profiles with changes`)
+    for (const entity of entities) {
       const message: QueueMessage = { entity, attempt: 0 }
       await queue.send(message)
-      logger.debug(`Added to queue address="${address}" and entity="${entity}"`)
+      logger.debug(`Added to queue entity="${entity}"`)
     }
     return timestamp
   }
@@ -44,7 +44,7 @@ export async function createProducerComponent({
 
     while (true) {
       try {
-        lastRun = await poll(interval, lastRun)
+        lastRun = await poll(lastRun)
         await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()))
       } catch (error: any) {
         logger.error(error)
