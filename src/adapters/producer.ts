@@ -45,7 +45,7 @@ export async function createProducerComponent({
         await queue.send(message)
       }
 
-      url = `${peerUrl}/content/pointer-changes${data.pagination.next}`
+      url = data.pagination.next && `${peerUrl}/content/pointer-changes${data.pagination.next}`
       logger.debug(`Got ${data.deltas.length} profiles with changes`)
     } while (url)
     return to
