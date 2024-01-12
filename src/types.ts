@@ -69,6 +69,7 @@ export class NotFoundError extends Error {
 
 export type StatusResponse = {
   commitHash: string
+  version: string
 }
 
 export type AwsConfig = {
