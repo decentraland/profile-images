@@ -24,6 +24,7 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   profileFetcher: ProfileFetcher
   queue: QueueService
+  retryQueue: QueueService
   queueWorker: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
@@ -83,6 +84,7 @@ export type IStorageComponent = {
   store(key: string, content: Buffer): Promise<void>
   retrieve(key: string): Promise<Buffer | undefined>
   deleteMultiple(keys: string[]): Promise<void>
+  storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
 }
 
 export type Images = {

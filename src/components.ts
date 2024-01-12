@@ -43,7 +43,7 @@ export async function initComponents(): Promise<AppComponents> {
     awsConfig.forcePathStyle = true
   }
 
-  const storage = await createStorageComponent({ awsConfig, config, metrics })
+  const storage = await createStorageComponent({ awsConfig, config, metrics, logs })
 
   const fetch = await createFetchComponent()
 
@@ -59,7 +59,8 @@ export async function initComponents(): Promise<AppComponents> {
     fetch
   })
 
-  const queue = await createQueueComponent({ awsConfig, config })
+  const queue = await createQueueComponent({ awsConfig }, await config.requireString('QUEUE_NAME'))
+  const retryQueue = await createQueueComponent({ awsConfig }, await config.requireString('RETRY_QUEUE_NAME'))
 
   const queueWorker = await createConsumerComponent({
     config,
@@ -87,6 +88,7 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     profileFetcher,
     queue,
+    retryQueue,
     queueWorker,
     server,
     storage,

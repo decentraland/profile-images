@@ -7,12 +7,11 @@ import {
 } from '@aws-sdk/client-sqs'
 import { AppComponents, QueueMessage, QueueSendOptions, QueueService } from '../types'
 
-export async function createQueueComponent({
-  awsConfig,
-  config
-}: Pick<AppComponents, 'awsConfig' | 'config'>): Promise<QueueService> {
+export async function createQueueComponent(
+  { awsConfig }: Pick<AppComponents, 'awsConfig'>,
+  queueName: string
+): Promise<QueueService> {
   const client = new SQSClient(awsConfig)
-  const queueName = await config.requireString('QUEUE_NAME')
 
   async function send(message: QueueMessage, options?: QueueSendOptions) {
     const sendCommand = new SendMessageCommand({
