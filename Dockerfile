@@ -1,6 +1,6 @@
 ARG RUN
 
-FROM quay.io/decentraland/godot-explorer:c115ad142aebea3c37b025851ce200d620dae207
+FROM quay.io/decentraland/godot-explorer:f99a1ed32ab1cc7d7bb30c0f5ccf36b4840b4901
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates
 
@@ -10,8 +10,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x  | bash - && apt-get -y ins
 # Clean apt cache
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-WORKDIR /app
-
 ARG COMMIT_HASH=local
 ARG CURRENT_VERSION=Unknown
 
@@ -19,10 +17,11 @@ ENV COMMIT_HASH=${COMMIT_HASH:-local}
 ENV CURRENT_VERSION=${CURRENT_VERSION:-Unknown}
 
 # build the app
+WORKDIR /app
 COPY . /app
 
-# Make commit hash available to application
-RUN echo "COMMIT_HASH=$COMMIT_HASH" >> .env
+# Create .env file to avoid runtime warnings
+RUN echo "" >> .env
 
 RUN npm i --global yarn
 RUN yarn --frozen-lockfile
