@@ -76,7 +76,6 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     logs,
     godot,
-    queue,
     retryQueue,
     storage
   })

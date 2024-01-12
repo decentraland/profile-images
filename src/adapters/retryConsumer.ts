@@ -6,7 +6,7 @@ export async function createRetryConsumerComponent({
   storage,
   retryQueue,
   config
-}: Pick<AppComponents, 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue' | 'config'>): Promise<QueueWorker> {
+}: Pick<AppComponents, 'logs' | 'godot' | 'storage' | 'retryQueue' | 'config'>): Promise<QueueWorker> {
   const logger = logs.getLogger('retry-consumer')
 
   const [commitHash, version] = await Promise.all([
