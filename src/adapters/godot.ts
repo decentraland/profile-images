@@ -140,7 +140,7 @@ export async function createGodotSnapshotComponent({
       const duration = Date.now() - start
 
       metrics.observe('snapshot_generation_duration_seconds', { status: 'ok' }, duration / payloads.length)
-      console.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
+      logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
       for (const result of results) {
         if (existsSync(result.avatarPath) && existsSync(result.facePath)) {

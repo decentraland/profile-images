@@ -25,7 +25,7 @@ export async function createConsumerComponent({
       const messageByEntity = new Map<string, Message>()
       for (const message of messages) {
         if (!message.Body) {
-          console.warn(
+          logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with undefined Body`
           )
           await queue.deleteMessage(message.ReceiptHandle!)
@@ -33,7 +33,7 @@ export async function createConsumerComponent({
         }
         const body: QueueMessage = JSON.parse(message.Body)
         if (body.entity === undefined || body.attempt === undefined) {
-          console.warn(
+          logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
           )
           await queue.deleteMessage(message.ReceiptHandle!)
@@ -67,10 +67,12 @@ export async function createConsumerComponent({
         // Cleanup
         for (const result of results) {
           const message = messageByEntity.get(result.entity)!
-          await queue.deleteMessage(message.ReceiptHandle!)
 
           // Schedule retries if needed
-          if (!result.status) {
+          if (result.error) {
+            await storage.store(`failures/${result.entity}.txt`, Buffer.from(result.error))
+            logger.debug(`Giving up on entity="${result.entity} because of godot failure.`)
+          } else if (!result.status) {
             const body: QueueMessage = JSON.parse(message.Body!)
             const attempts = body.attempt
             if (attempts < 4) {
@@ -79,11 +81,10 @@ export async function createConsumerComponent({
               logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
             } else {
               logger.debug(`Giving up on entity="${result.entity} after 5 retries.`)
-              if (result.error) {
-                await storage.store(`failures/${result.entity}.txt`, Buffer.from(result.error))
-              }
             }
           }
+
+          await queue.deleteMessage(message.ReceiptHandle!)
         }
       } finally {
         console.timeEnd('generate images + upload to s3')
