@@ -22,7 +22,6 @@ export type BaseComponents = {
   jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  profileFetcher: ProfileFetcher
   queue: QueueService
   retryQueue: QueueService
   queueWorker: QueueWorker

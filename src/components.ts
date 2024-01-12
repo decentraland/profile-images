@@ -8,7 +8,6 @@ import { createFetchComponent } from './adapters/fetch'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createProducerComponent } from './adapters/producer'
-import { createProfileFetcher } from './adapters/profile-fetcher'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createQueueComponent } from './adapters/queue'
 import { createRetryConsumerComponent } from './adapters/retryConsumer'
@@ -55,11 +54,6 @@ export async function initComponents(): Promise<AppComponents> {
     metrics
   })
 
-  const profileFetcher = await createProfileFetcher({
-    config,
-    fetch
-  })
-
   const queue = await createQueueComponent({ awsConfig }, await config.requireString('QUEUE_NAME'))
   const retryQueue = await createQueueComponent({ awsConfig }, await config.requireString('RETRY_QUEUE_NAME'))
 
@@ -83,9 +77,9 @@ export async function initComponents(): Promise<AppComponents> {
   const jobProducer = await createProducerComponent({
     config,
     logs,
-    profileFetcher,
     queue,
-    storage
+    storage,
+    fetch
   })
 
   return {
@@ -96,7 +90,6 @@ export async function initComponents(): Promise<AppComponents> {
     jobProducer,
     logs,
     metrics,
-    profileFetcher,
     queue,
     retryQueue,
     queueWorker,
