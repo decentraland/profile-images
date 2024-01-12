@@ -76,14 +76,8 @@ export async function createGodotSnapshotComponent({
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
-      exec(command, { timeout: 30_000 }, (error, _stdout, _stderr) => {
+      exec(command, { timeout: 30_000 }, (_error, _stdout, _stderr) => {
         rmSync(avatarDataPath)
-
-        if (error) {
-          logger.warn(`There was a problem processing the batch of ${input.payload.length} profiles.`)
-          return reject(error)
-        }
-
         resolve()
       })
     })
@@ -116,7 +110,8 @@ export async function createGodotSnapshotComponent({
         })
       }
       results.push({
-        status: false,
+        success: false,
+        entityFound: !!profile,
         entity,
         avatarPath: destPath,
         facePath: faceDestPath
@@ -142,7 +137,7 @@ export async function createGodotSnapshotComponent({
 
     for (const result of results) {
       if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-        result.status = true
+        result.success = true
       }
     }
 

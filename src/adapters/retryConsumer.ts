@@ -28,11 +28,11 @@ export async function createRetryConsumerComponent({
         const results = await godot.generateImages([entity])
         const result = results[0]
 
-        if (result.status) {
-          result.status = await storage.storeImages(entity, result.avatarPath, result.facePath)
+        if (result.success) {
+          result.success = await storage.storeImages(entity, result.avatarPath, result.facePath)
         }
 
-        if (!result.status) {
+        if (!result.success) {
           const body: QueueMessage = JSON.parse(message.Body!)
           const attempts = body.attempt
           if (attempts < 4) {

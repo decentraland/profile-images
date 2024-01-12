@@ -1,5 +1,5 @@
 import { Message } from '@aws-sdk/client-sqs'
-import { AppComponents, AvatarGenerationResult, QueueMessage, QueueWorker } from '../types'
+import { AppComponents, QueueMessage, QueueWorker } from '../types'
 
 export async function createConsumerComponent({
   config,
@@ -42,28 +42,17 @@ export async function createConsumerComponent({
         messageByEntity.set(body.entity, message)
       }
 
-      let results: AvatarGenerationResult[]
-      try {
-        results = await godot.generateImages(Array.from(messageByEntity.keys()))
-      } catch (err) {
-        for (const entity of messageByEntity.keys()) {
-          logger.debug(`Godot failure, enqueue for individual retry, entity=${entity}`)
-          const message = messageByEntity.get(entity)!
-          await retryQueue.send({ entity, attempt: 0 })
-          await queue.deleteMessage(message.ReceiptHandle!)
-        }
-        continue
-      }
+      const results = await godot.generateImages(Array.from(messageByEntity.keys()))
 
       for (const result of results) {
-        if (result.status) {
-          result.status = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
-        }
-
         const message = messageByEntity.get(result.entity)!
-
-        // Schedule retries if needed
-        if (!result.status) {
+        if (result.success) {
+          const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
+          if (!success) {
+            continue
+          }
+        } else if (!result.entityFound) {
+          // NOTE: most likely the entity is not active, but we requeue in case the entity is not yet synchonized
           const body: QueueMessage = JSON.parse(message.Body!)
           const attempts = body.attempt
           if (attempts < 4) {
@@ -73,6 +62,9 @@ export async function createConsumerComponent({
           } else {
             logger.debug(`Giving up on entity="${result.entity} after 5 retries.`)
           }
+        } else {
+          logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
+          await retryQueue.send({ entity: result.entity, attempt: 0 })
         }
 
         await queue.deleteMessage(message.ReceiptHandle!)

@@ -94,7 +94,8 @@ export type Images = {
 
 export type AvatarGenerationResult = {
   entity: string
-  status: boolean
+  entityFound: boolean
+  success: boolean
   avatarPath: string
   facePath: string
 }

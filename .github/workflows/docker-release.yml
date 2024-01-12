@@ -9,6 +9,6 @@ jobs:
   cd:
     uses: decentraland/platform-actions/.github/workflows/apps-docker-release.yml@main
     with:
-      service-name: profile-images-worker
+      service-name: profile-images
       deployment-environment: prd
     secrets: inherit
