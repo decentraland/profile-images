@@ -1,13 +1,14 @@
 import { Message } from '@aws-sdk/client-sqs'
-import { AppComponents, QueueMessage, QueueWorker } from '../types'
+import { AppComponents, AvatarGenerationResult, QueueMessage, QueueWorker } from '../types'
 
 export async function createConsumerComponent({
   config,
   logs,
   godot,
   queue,
-  storage
-}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'queue' | 'storage'>): Promise<QueueWorker> {
+  storage,
+  retryQueue
+}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
 
@@ -41,24 +42,28 @@ export async function createConsumerComponent({
         messageByEntity.set(body.entity, message)
       }
 
-      const results = await godot.generateImages(Array.from(messageByEntity.keys()))
-      logger.debug(`results: ${JSON.stringify(results)}`)
+      let results: AvatarGenerationResult[]
+      try {
+        results = await godot.generateImages(Array.from(messageByEntity.keys()))
+      } catch (err) {
+        for (const entity of messageByEntity.keys()) {
+          logger.debug(`Godot failure, enqueue for individual retry, entity=${entity}`)
+          const message = messageByEntity.get(entity)!
+          await retryQueue.send({ entity, attempt: 0 })
+          await queue.deleteMessage(message.ReceiptHandle!)
+        }
+        continue
+      }
 
       for (const result of results) {
         if (result.status) {
           result.status = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
         }
-      }
 
-      // Cleanup
-      for (const result of results) {
         const message = messageByEntity.get(result.entity)!
 
         // Schedule retries if needed
-        if (result.error) {
-          await storage.store(`failures/${result.entity}.txt`, Buffer.from(result.error))
-          logger.debug(`Giving up on entity="${result.entity} because of godot failure.`)
-        } else if (!result.status) {
+        if (!result.status) {
           const body: QueueMessage = JSON.parse(message.Body!)
           const attempts = body.attempt
           if (attempts < 4) {

@@ -70,7 +70,6 @@ export async function createGodotSnapshotComponent({
         mkdirSync(outputPath)
       }
 
-      // logger.debug(`output: ${JSON.stringify(output)}`)
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
 
       await writeFile(avatarDataPath, JSON.stringify(input))
@@ -133,29 +132,17 @@ export async function createGodotSnapshotComponent({
       payload: payloads
     }
 
-    logger.debug(`Running godot to process ${payloads.length}: ${JSON.stringify(input)}`)
+    logger.debug(`Running godot to process ${payloads.length} avatars `)
     const start = Date.now()
-    try {
-      await run(input)
-      const duration = Date.now() - start
+    await run(input)
+    const duration = Date.now() - start
 
-      metrics.observe('snapshot_generation_duration_seconds', { status: 'ok' }, duration / payloads.length)
-      logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
+    metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length)
+    logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
-      for (const result of results) {
-        if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-          result.status = true
-        }
-      }
-    } catch (err) {
-      const duration = Date.now() - start
-      metrics.observe('snapshot_generation_duration_seconds', { status: 'error' }, duration / payloads.length)
-      console.log(`screenshots for ${payloads.length} entities: ${duration} ms (failed)`)
-
-      for (const result of results) {
-        if (!existsSync(result.avatarPath)) {
-          result.error = `${err}\n`
-        }
+    for (const result of results) {
+      if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
+        result.status = true
       }
     }
 

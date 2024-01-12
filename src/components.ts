@@ -11,6 +11,7 @@ import { createProducerComponent } from './adapters/producer'
 import { createProfileFetcher } from './adapters/profile-fetcher'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createQueueComponent } from './adapters/queue'
+import { createRetryConsumerComponent } from './adapters/retryConsumer'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -67,6 +68,16 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     godot,
     queue,
+    retryQueue,
+    storage
+  })
+
+  const retryQueueWorker = await createRetryConsumerComponent({
+    config,
+    logs,
+    godot,
+    queue,
+    retryQueue,
     storage
   })
 
@@ -90,6 +101,7 @@ export async function initComponents(): Promise<AppComponents> {
     queue,
     retryQueue,
     queueWorker,
+    retryQueueWorker,
     server,
     storage,
     statusChecks

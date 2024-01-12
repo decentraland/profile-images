@@ -26,6 +26,7 @@ export type BaseComponents = {
   queue: QueueService
   retryQueue: QueueService
   queueWorker: QueueWorker
+  retryQueueWorker: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
 }
@@ -95,7 +96,6 @@ export type Images = {
 export type AvatarGenerationResult = {
   entity: string
   status: boolean
-  error?: string
   avatarPath: string
   facePath: string
 }
