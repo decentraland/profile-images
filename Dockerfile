@@ -1,5 +1,3 @@
-ARG RUN
-
 FROM quay.io/decentraland/godot-explorer:f99a1ed32ab1cc7d7bb30c0f5ccf36b4840b4901
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates
