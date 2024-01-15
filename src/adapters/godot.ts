@@ -2,7 +2,7 @@ import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
-import { AppComponents, AvatarGenerationResult, GodotComponent } from '../types'
+import { AppComponents, AvatarGenerationResult } from '../types'
 import { Entity } from '@dcl/schemas'
 
 type GodotAvatarPayload = {
@@ -14,6 +14,10 @@ type GodotAvatarPayload = {
   faceWidth: number | undefined
   faceHeight: number | undefined
   avatar: any
+}
+
+export type GodotComponent = {
+  generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
 }
 
 export function splitUrnAndTokenId(urnReceived: string) {
@@ -61,7 +65,7 @@ export async function createGodotSnapshotComponent({
   let executionNumber = 0
 
   function run(input: any): Promise<void> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       // unique number for temp files
       executionNumber += 1
 

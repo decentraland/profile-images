@@ -8,6 +8,7 @@ import type {
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
 import { Message } from '@aws-sdk/client-sqs'
+import { GodotComponent } from './adapters/godot'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -100,10 +101,6 @@ export type AvatarGenerationResult = {
   facePath: string
 }
 
-export type GodotComponent = {
-  generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
-}
-
 export type QueueSendOptions = {
   delay?: number
 }
@@ -122,8 +119,4 @@ export type QueueMessage = {
 export type QueueWorker = IBaseComponent
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>
-}
-
-export type ProfileFetcher = {
-  getProfilesWithChanges(from: number): Promise<{ entities: string[]; timestamp: number }>
 }

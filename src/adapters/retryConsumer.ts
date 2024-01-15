@@ -37,7 +37,7 @@ export async function createRetryConsumerComponent({
           const attempts = body.attempt
           if (attempts < 4) {
             const message: QueueMessage = { entity: result.entity, attempt: attempts + 1 }
-            await retryQueue.send(message, { delay: 15 })
+            await retryQueue.send(message, { delay: 60 })
             logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
           } else {
             logger.debug(`Giving up on entity="${result.entity} after 5 retries.`)
