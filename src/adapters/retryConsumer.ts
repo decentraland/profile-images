@@ -52,7 +52,11 @@ export async function createRetryConsumerComponent({
           version,
           entity
         }
-        await storage.store(`failures/${entity}.txt`, Buffer.from(JSON.stringify(failure)))
+        try {
+          await storage.store(`failures/${entity}.txt`, Buffer.from(JSON.stringify(failure)))
+        } catch (err) {
+          logger.error(`cannot store ${entity} failure: ${JSON.stringify(err)}`)
+        }
       }
 
       await retryQueue.deleteMessage(message.ReceiptHandle!)
