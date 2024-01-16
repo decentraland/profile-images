@@ -10,7 +10,7 @@ export async function setupRouter(_globalContext: GlobalContext): Promise<Router
 
   router.use(errorHandler)
 
-  router.post('/admin', adminHandler)
+  router.post('/tools', adminHandler)
   router.post('/schedule-processing', scheduleProcessingHandler)
 
   router.get('/status', statusHandler)

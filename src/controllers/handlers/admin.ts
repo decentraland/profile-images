@@ -2,7 +2,7 @@ import { HandlerContextWithPath } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function adminHandler(
-  context: HandlerContextWithPath<'jobProducer' | 'logs' | 'consumer' | 'retryConsumer', '/admin'>
+  context: HandlerContextWithPath<'jobProducer' | 'logs' | 'consumer' | 'retryConsumer', '/tools'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
@@ -20,12 +20,12 @@ export async function adminHandler(
   }
 
   if (body.consumer) {
-    await consumer.setPaused(body.consumer)
+    consumer.setPaused(body.consumer)
     logger.debug(`Consumer is now: ${body.consumer ? 'paused' : 'running'}`)
   }
 
   if (body.retryConsumer) {
-    await retryConsumer.setPaused(body.retryConsumer)
+    retryConsumer.setPaused(body.retryConsumer)
     logger.debug(`RetryConsumer is now: ${body.retryConsumer ? 'paused' : 'running'}`)
   }
 
