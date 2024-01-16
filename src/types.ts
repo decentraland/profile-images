@@ -89,11 +89,6 @@ export type IStorageComponent = {
   storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
 }
 
-export type Images = {
-  body: Buffer
-  face: Buffer
-}
-
 export type ExtendedAvatar = {
   entity: string
   avatar: AvatarInfo
