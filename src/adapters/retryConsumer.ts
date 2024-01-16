@@ -53,7 +53,7 @@ export async function createRetryConsumerComponent({
           entity
         }
         try {
-          await storage.store(`failures/${entity}.txt`, Buffer.from(JSON.stringify(failure)))
+          await storage.store(`failures/${entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
         } catch (err) {
           logger.error(`cannot store ${entity} failure: ${JSON.stringify(err)}`)
         }

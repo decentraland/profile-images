@@ -82,7 +82,7 @@ export type AwsConfig = {
 }
 
 export type IStorageComponent = {
-  store(key: string, content: Buffer): Promise<void>
+  store(key: string, content: Buffer, contentType: string): Promise<void>
   retrieve(key: string): Promise<Buffer | undefined>
   deleteMultiple(keys: string[]): Promise<void>
   storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>

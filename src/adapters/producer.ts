@@ -53,7 +53,7 @@ export async function createProducerComponent({
 
   async function changeLastRun(ts: number) {
     lastRun = ts
-    await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()))
+    await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
   }
 
   async function start() {
@@ -70,7 +70,7 @@ export async function createProducerComponent({
     while (true) {
       try {
         lastRun = await poll(lastRun)
-        await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()))
+        await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
       } catch (error: any) {
         logger.error(error)
       }
