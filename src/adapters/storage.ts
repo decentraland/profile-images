@@ -13,7 +13,7 @@ export async function createStorageComponent({
   const s3 = new S3Client(awsConfig)
   const bucket = await config.requireString('BUCKET_NAME')
 
-  async function store(key: string, content: Buffer): Promise<void> {
+  async function store(key: string, content: Buffer, contentType: string): Promise<void> {
     const timer = metrics.startTimer('image_upload_duration_seconds')
     let status = 'success'
     try {
@@ -23,7 +23,7 @@ export async function createStorageComponent({
           Bucket: bucket,
           Key: key,
           Body: content,
-          ContentType: 'image/png'
+          ContentType: contentType
         }
       })
       await upload.done()
@@ -66,7 +66,10 @@ export async function createStorageComponent({
   async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
-      await Promise.all([store(`entities/${entity}/body.png`, body), store(`entities/${entity}/face.png`, face)])
+      await Promise.all([
+        store(`entities/${entity}/body.png`, body, 'image/png'),
+        store(`entities/${entity}/face.png`, face, 'image/png')
+      ])
       return true
     } catch (err) {
       logger.debug(`Error uploading images to bucket, marking job for retrying it: "${entity}"`)
