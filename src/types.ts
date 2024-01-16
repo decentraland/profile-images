@@ -9,6 +9,7 @@ import type {
 import { metricDeclarations } from './metrics'
 import { Message } from '@aws-sdk/client-sqs'
 import { GodotComponent } from './adapters/godot'
+import { AvatarInfo } from '@dcl/schemas'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -93,9 +94,12 @@ export type Images = {
   face: Buffer
 }
 
-export type AvatarGenerationResult = {
+export type ExtendedAvatar = {
   entity: string
-  entityFound: boolean
+  avatar: AvatarInfo
+}
+
+export type AvatarGenerationResult = ExtendedAvatar & {
   success: boolean
   avatarPath: string
   facePath: string
@@ -106,14 +110,9 @@ export type QueueSendOptions = {
 }
 
 export type QueueService = {
-  send(message: QueueMessage, options?: QueueSendOptions): Promise<void>
+  send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
   receive(max: number): Promise<Message[]>
   deleteMessage(receiptHandle: string): Promise<void>
-}
-
-export type QueueMessage = {
-  entity: string
-  attempt: number
 }
 
 export type QueueWorker = IBaseComponent

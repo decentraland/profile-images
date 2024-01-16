@@ -2,22 +2,20 @@ import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
-import { AppComponents, AvatarGenerationResult } from '../types'
-import { Entity } from '@dcl/schemas'
+import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
+import { AvatarInfo } from '@dcl/schemas'
 
-type GodotAvatarPayload = {
-  entity: string
+type GodotAvatarPayload = ExtendedAvatar & {
   destPath: string
   width: number | undefined
   height: number | undefined
   faceDestPath: string
   faceWidth: number | undefined
   faceHeight: number | undefined
-  avatar: any
 }
 
 export type GodotComponent = {
-  generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
+  generateImages(profiles: ExtendedAvatar[]): Promise<AvatarGenerationResult[]>
 }
 
 export function splitUrnAndTokenId(urnReceived: string) {
@@ -38,28 +36,21 @@ const height = 512
 const faceWidth = 256
 const faceHeight = 256
 
-const profileWithAssetUrns = (profile: any) => ({
-  ...profile,
-  metadata: {
-    ...profile.metadata,
-    avatars: profile.metadata.avatars.map((av: any) => ({
-      ...av,
-      avatar: {
-        ...av.avatar,
-        wearables: av.avatar.wearables.map((wearable: any) => splitUrnAndTokenId(wearable).urn)
-      }
-    }))
+// TODO: not sure if this workds
+function normalizeUrns(avatar: AvatarInfo): AvatarInfo {
+  return {
+    ...avatar,
+    wearables: avatar.wearables.map((wearable: any) => splitUrnAndTokenId(wearable).urn)
   }
-})
+}
 
 export async function createGodotSnapshotComponent({
-  config,
-  fetch,
   logs,
-  metrics
-}: Pick<AppComponents, 'config' | 'fetch' | 'logs' | 'metrics'>): Promise<GodotComponent> {
-  const logger = logs.getLogger('godot-snapshot')
+  metrics,
+  config
+}: Pick<AppComponents, 'logs' | 'metrics' | 'config'>): Promise<GodotComponent> {
   const peerUrl = await config.requireString('PEER_URL')
+  const logger = logs.getLogger('godot-snapshot')
   const explorerPath = process.env.EXPLORER_PATH || '.'
 
   let executionNumber = 0
@@ -87,35 +78,26 @@ export async function createGodotSnapshotComponent({
     })
   }
 
-  async function generateImages(entities: string[]): Promise<AvatarGenerationResult[]> {
-    const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
-      method: 'POST',
-      body: JSON.stringify({ ids: entities })
-    })
-    const profiles: Entity[] = (await response.json()).map(profileWithAssetUrns)
-
+  async function generateImages(avatars: ExtendedAvatar[]): Promise<AvatarGenerationResult[]> {
     const payloads: GodotAvatarPayload[] = []
     const results: AvatarGenerationResult[] = []
 
-    for (const entity of entities) {
-      const profile = profiles.find((p) => p.id === entity)
+    for (const { entity, avatar } of avatars) {
       const destPath = path.join(outputPath, `${entity}.png`)
       const faceDestPath = path.join(outputPath, `${entity}_face.png`)
-      if (profile) {
-        payloads.push({
-          entity,
-          destPath,
-          width,
-          height,
-          faceDestPath,
-          faceWidth,
-          faceHeight,
-          avatar: profile.metadata.avatars[0].avatar
-        })
-      }
+      payloads.push({
+        entity,
+        destPath,
+        width,
+        height,
+        faceDestPath,
+        faceWidth,
+        faceHeight,
+        avatar: normalizeUrns(avatar)
+      })
       results.push({
         success: false,
-        entityFound: !!profile,
+        avatar,
         entity,
         avatarPath: destPath,
         facePath: faceDestPath

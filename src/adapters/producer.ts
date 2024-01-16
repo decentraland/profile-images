@@ -1,10 +1,10 @@
-import { AppComponents, JobProducer, QueueMessage } from '../types'
+import { AppComponents, JobProducer, ExtendedAvatar } from '../types'
 import { sleep } from '../logic/sleep'
 import { Entity, EntityType, Profile } from '@dcl/schemas'
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
 
-type Delta = Omit<Entity, 'metadata'> & { metadata: Profile; entityId: string }
+type Delta = Omit<Entity, 'metadata' | 'id'> & { metadata: Profile; entityId: string; localTimestamp: number }
 
 type PointerChangesResponse = {
   deltas: Delta[]
@@ -34,19 +34,45 @@ export async function createProducerComponent({
   let lastRun = Date.now() - interval
 
   async function poll(lastTimestamp: number): Promise<number> {
-    const to = Date.now()
-    let url = `${peerUrl}/content/pointer-changes?entityType=${EntityType.PROFILE}&from=${lastTimestamp}&to=${to}`
+    let url = `${peerUrl}/content/pointer-changes?entityType=${
+      EntityType.PROFILE
+    }&from=${lastTimestamp}&to=${Date.now()}`
 
+    const statusResponse = await fetch.fetch(`${peerUrl}/content/status`)
+    const status = await statusResponse.json()
+    if (status.synchronizationStatus.synchronizationState !== 'Syncing') {
+      logger.error('${peerUrl} is not syncing')
+      return lastTimestamp
+    }
+
+    let to = lastTimestamp
     do {
-      const response = await fetch.fetch(url)
-      const data: PointerChangesResponse = await response.json()
-      for (const profile of data.deltas) {
-        const message: QueueMessage = { entity: profile.entityId, attempt: 0 }
-        await queue.send(message)
+      const pointerChanges: PointerChangesResponse = await (await fetch.fetch(url)).json()
+      const ids: string[] = []
+
+      for (const delta of pointerChanges.deltas) {
+        ids.push(delta.entityId)
+        if (delta.localTimestamp > to) {
+          to = delta.localTimestamp
+        }
       }
 
-      url = data.pagination.next && `${peerUrl}/content/pointer-changes${data.pagination.next}`
-      logger.debug(`Got ${data.deltas.length} profiles with changes`)
+      if (ids.length > 0) {
+        const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
+          method: 'POST',
+          body: JSON.stringify({ ids })
+        })
+
+        const activeEntities: Entity[] = await response.json()
+
+        for (const entity of activeEntities) {
+          const message: ExtendedAvatar = { entity: entity.id, avatar: entity.metadata.avatars[0].avatar }
+          await queue.send(message)
+        }
+
+        logger.debug(`Got ${activeEntities.length} active entities`)
+      }
+      url = pointerChanges.pagination.next && `${peerUrl}/content/pointer-changes${pointerChanges.pagination.next}`
     } while (url)
     return to
   }
