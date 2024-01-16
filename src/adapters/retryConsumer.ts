@@ -1,4 +1,5 @@
 import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
+import { sleep } from '../logic/sleep'
 
 export async function createRetryConsumerComponent({
   logs,
@@ -8,15 +9,24 @@ export async function createRetryConsumerComponent({
   config
 }: Pick<AppComponents, 'logs' | 'godot' | 'storage' | 'retryQueue' | 'config'>): Promise<QueueWorker> {
   const logger = logs.getLogger('retry-consumer')
+  let paused = false
 
   const [commitHash, version] = await Promise.all([
     config.getString('COMMIT_HASH'),
     config.getString('CURRENT_VERSION')
   ])
 
+  function setPaused(p: boolean): void {
+    paused = p
+  }
+
   async function start() {
     logger.debug('Starting retry consumer')
     while (true) {
+      if (paused) {
+        await sleep(60 * 1000)
+        continue
+      }
       const messages = await retryQueue.receive(1)
       if (messages.length === 0) {
         continue
@@ -47,5 +57,5 @@ export async function createRetryConsumerComponent({
     }
   }
 
-  return { start }
+  return { setPaused, start }
 }

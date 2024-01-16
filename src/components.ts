@@ -56,7 +56,7 @@ export async function initComponents(): Promise<AppComponents> {
   const queue = await createQueueComponent({ awsConfig }, await config.requireString('QUEUE_NAME'))
   const retryQueue = await createQueueComponent({ awsConfig }, await config.requireString('RETRY_QUEUE_NAME'))
 
-  const queueWorker = await createConsumerComponent({
+  const consumer = await createConsumerComponent({
     config,
     logs,
     godot,
@@ -65,7 +65,7 @@ export async function initComponents(): Promise<AppComponents> {
     storage
   })
 
-  const retryQueueWorker = await createRetryConsumerComponent({
+  const retryConsumer = await createRetryConsumerComponent({
     config,
     logs,
     godot,
@@ -91,8 +91,8 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     queue,
     retryQueue,
-    queueWorker,
-    retryQueueWorker,
+    consumer,
+    retryConsumer,
     server,
     storage,
     statusChecks

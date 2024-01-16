@@ -1,5 +1,6 @@
 import { Message } from '@aws-sdk/client-sqs'
 import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
+import { sleep } from '../logic/sleep'
 
 export async function createConsumerComponent({
   config,
@@ -11,10 +12,20 @@ export async function createConsumerComponent({
 }: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
+  let paused = false
+
+  function setPaused(p: boolean): void {
+    paused = p
+  }
 
   async function start() {
     logger.debug('Starting consumer')
     while (true) {
+      if (paused) {
+        await sleep(60 * 1000)
+        continue
+      }
+
       const messages = await queue.receive(maxJobs)
       if (messages.length === 0) {
         continue
@@ -66,5 +77,5 @@ export async function createConsumerComponent({
     }
   }
 
-  return { start }
+  return { setPaused, start }
 }

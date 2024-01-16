@@ -26,8 +26,8 @@ export type BaseComponents = {
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   queue: QueueService
   retryQueue: QueueService
-  queueWorker: QueueWorker
-  retryQueueWorker: QueueWorker
+  consumer: QueueWorker
+  retryConsumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
 }
@@ -110,7 +110,10 @@ export type QueueService = {
   deleteMessage(receiptHandle: string): Promise<void>
 }
 
-export type QueueWorker = IBaseComponent
+export type QueueWorker = IBaseComponent & {
+  setPaused(paused: boolean): void
+}
+
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>
 }
