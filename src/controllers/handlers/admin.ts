@@ -19,12 +19,14 @@ export async function adminHandler(
     logger.debug(`Setting last run to: ${body.lastRun}`)
   }
 
-  if (body.consumer) {
+  console.log(body)
+
+  if (typeof body.consumer !== 'undefined') {
     consumer.setPaused(body.consumer)
     logger.debug(`Consumer is now: ${body.consumer ? 'paused' : 'running'}`)
   }
 
-  if (body.retryConsumer) {
+  if (typeof body.retryConsumer !== 'undefined') {
     retryConsumer.setPaused(body.retryConsumer)
     logger.debug(`RetryConsumer is now: ${body.retryConsumer ? 'paused' : 'running'}`)
   }
