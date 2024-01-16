@@ -36,7 +36,6 @@ const height = 512
 const faceWidth = 256
 const faceHeight = 256
 
-// TODO: not sure if this workds
 function normalizeUrns(avatar: AvatarInfo): AvatarInfo {
   return {
     ...avatar,
