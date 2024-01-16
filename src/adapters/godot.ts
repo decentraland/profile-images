@@ -112,7 +112,7 @@ export async function createGodotSnapshotComponent({
       payload: payloads
     }
 
-    logger.debug(`Running godot to process ${payloads.length} avatars `)
+    logger.debug(`Running godot to process ${payloads.length} avatars`)
     const start = Date.now()
     await run(input)
     const duration = Date.now() - start
