@@ -1,5 +1,5 @@
 import { Message } from '@aws-sdk/client-sqs'
-import { AppComponents, QueueMessage, QueueWorker } from '../types'
+import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
 
 export async function createConsumerComponent({
   config,
@@ -23,6 +23,8 @@ export async function createConsumerComponent({
       logger.debug(`Processing: ${messages.length} profiles`)
 
       const messageByEntity = new Map<string, Message>()
+
+      const input: ExtendedAvatar[] = []
       for (const message of messages) {
         if (!message.Body) {
           logger.warn(
@@ -31,8 +33,8 @@ export async function createConsumerComponent({
           await queue.deleteMessage(message.ReceiptHandle!)
           continue
         }
-        const body: QueueMessage = JSON.parse(message.Body)
-        if (body.entity === undefined || body.attempt === undefined) {
+        const body: ExtendedAvatar = JSON.parse(message.Body)
+        if (!body.avatar) {
           logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
           )
@@ -40,31 +42,23 @@ export async function createConsumerComponent({
           continue
         }
         messageByEntity.set(body.entity, message)
+
+        input.push(body)
       }
 
-      const results = await godot.generateImages(Array.from(messageByEntity.keys()))
+      const results = await godot.generateImages(input)
 
       for (const result of results) {
         const message = messageByEntity.get(result.entity)!
         if (result.success) {
           const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
           if (!success) {
+            logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
             continue
-          }
-        } else if (!result.entityFound) {
-          // NOTE: most likely the entity is not active, but we requeue in case the entity is not yet synchonized
-          const body: QueueMessage = JSON.parse(message.Body!)
-          const attempts = body.attempt
-          if (attempts < 4) {
-            const message: QueueMessage = { entity: result.entity, attempt: attempts + 1 }
-            await queue.send(message, { delay: 15 })
-            logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
-          } else {
-            logger.debug(`Giving up on entity="${result.entity} after 5 retries.`)
           }
         } else {
           logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
-          await retryQueue.send({ entity: result.entity, attempt: 0 })
+          await retryQueue.send({ entity: result.entity, avatar: result.avatar })
         }
 
         await queue.deleteMessage(message.ReceiptHandle!)

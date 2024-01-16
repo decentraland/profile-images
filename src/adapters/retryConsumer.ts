@@ -1,4 +1,4 @@
-import { AppComponents, QueueMessage, QueueWorker } from '../types'
+import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
 
 export async function createRetryConsumerComponent({
   logs,
@@ -22,41 +22,25 @@ export async function createRetryConsumerComponent({
         continue
       }
       const message = messages[0]
-      const { entity }: QueueMessage = JSON.parse(message.Body!)
+      const avatar: ExtendedAvatar = JSON.parse(message.Body!)
 
-      try {
-        const results = await godot.generateImages([entity])
-        const result = results[0]
+      const results = await godot.generateImages([avatar])
+      const result = results[0]
 
-        if (result.success) {
-          result.success = await storage.storeImages(entity, result.avatarPath, result.facePath)
+      if (result.success) {
+        const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
+        if (!success) {
+          logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
+          return
         }
-
-        if (!result.success) {
-          const body: QueueMessage = JSON.parse(message.Body!)
-          const attempts = body.attempt
-          if (attempts < 4) {
-            const message: QueueMessage = { entity: result.entity, attempt: attempts + 1 }
-            await retryQueue.send(message, { delay: 15 })
-            logger.debug(`Added to queue entity="${result.entity} with retry attempt=${attempts + 1}"`)
-          } else {
-            logger.debug(`Giving up on entity="${result.entity} after 5 retries.`)
-          }
-        }
-        await retryQueue.deleteMessage(message.ReceiptHandle!)
-      } catch (err) {
-        logger.debug(`Giving up on entity="${entity} because of godot failure.`)
+      } else {
+        logger.debug(`Giving up on entity="${result.entity} because of godot failure.`)
         const failure = {
-          error: err,
           commitHash,
           version,
-          entity
+          entity: result.entity
         }
-        try {
-          await storage.store(`failures/${entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
-        } catch (err) {
-          logger.error(`cannot store ${entity} failure: ${JSON.stringify(err)}`)
-        }
+        await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
       }
 
       await retryQueue.deleteMessage(message.ReceiptHandle!)

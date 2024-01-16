@@ -8,6 +8,8 @@ import type {
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
 import { Message } from '@aws-sdk/client-sqs'
+import { GodotComponent } from './adapters/godot'
+import { AvatarInfo } from '@dcl/schemas'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -87,21 +89,15 @@ export type IStorageComponent = {
   storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
 }
 
-export type Images = {
-  body: Buffer
-  face: Buffer
+export type ExtendedAvatar = {
+  entity: string
+  avatar: AvatarInfo
 }
 
-export type AvatarGenerationResult = {
-  entity: string
-  entityFound: boolean
+export type AvatarGenerationResult = ExtendedAvatar & {
   success: boolean
   avatarPath: string
   facePath: string
-}
-
-export type GodotComponent = {
-  generateImages(entities: string[]): Promise<AvatarGenerationResult[]>
 }
 
 export type QueueSendOptions = {
@@ -109,21 +105,12 @@ export type QueueSendOptions = {
 }
 
 export type QueueService = {
-  send(message: QueueMessage, options?: QueueSendOptions): Promise<void>
+  send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
   receive(max: number): Promise<Message[]>
   deleteMessage(receiptHandle: string): Promise<void>
-}
-
-export type QueueMessage = {
-  entity: string
-  attempt: number
 }
 
 export type QueueWorker = IBaseComponent
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>
-}
-
-export type ProfileFetcher = {
-  getProfilesWithChanges(from: number): Promise<{ entities: string[]; timestamp: number }>
 }
