@@ -1,5 +1,6 @@
 import {
   DeleteMessageCommand,
+  GetQueueAttributesCommand,
   Message,
   ReceiveMessageCommand,
   SendMessageCommand,
@@ -41,9 +42,27 @@ export async function createQueueComponent(
     await client.send(deleteCommand)
   }
 
+  async function status(): Promise<Record<string, any>> {
+    const command = new GetQueueAttributesCommand({
+      QueueUrl: queueName,
+      AttributeNames: [
+        'ApproximateNumberOfMessages',
+        'ApproximateNumberOfMessagesNotVisible',
+        'ApproximateNumberOfMessagesDelayed'
+      ]
+    })
+    const response = await client.send(command)
+    return {
+      ApproximateNumberOfMessages: response.Attributes?.ApproximateNumberOfMessages,
+      ApproximateNumberOfMessagesNotVisible: response.Attributes?.ApproximateNumberOfMessagesNotVisible,
+      ApproximateNumberOfMessagesDelayed: response.Attributes?.ApproximateNumberOfMessagesDelayed
+    }
+  }
+
   return {
     send,
     receive,
-    deleteMessage
+    deleteMessage,
+    status
   }
 }

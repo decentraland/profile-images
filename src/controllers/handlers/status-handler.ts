@@ -2,7 +2,7 @@ import { HandlerContextWithPath, StatusResponse } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function statusHandler(
-  context: HandlerContextWithPath<'config', '/status'>
+  context: HandlerContextWithPath<'config' | 'queue' | 'retryQueue', '/status'>
 ): Promise<IHttpServerComponent.IResponse> {
   const { config } = context.components
 
@@ -11,9 +11,18 @@ export async function statusHandler(
     config.getString('CURRENT_VERSION')
   ])
 
+  const [queueStatus, retryQueueStatus] = await Promise.all([
+    context.components.queue.status(),
+    context.components.retryQueue.status()
+  ])
+
   const status: StatusResponse = {
     commitHash: commitHash || 'Unknown',
-    version: version || 'Unknown'
+    version: version || 'Unknown',
+    queues: {
+      queue: queueStatus,
+      retryQueue: retryQueueStatus
+    }
   }
 
   return {

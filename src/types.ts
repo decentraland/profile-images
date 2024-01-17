@@ -73,6 +73,7 @@ export class NotFoundError extends Error {
 export type StatusResponse = {
   commitHash: string
   version: string
+  queues: any
 }
 
 export type AwsConfig = {
@@ -108,6 +109,7 @@ export type QueueService = {
   send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
   receive(max: number): Promise<Message[]>
   deleteMessage(receiptHandle: string): Promise<void>
+  status(): Promise<Record<string, any>>
 }
 
 export type QueueWorker = IBaseComponent & {
