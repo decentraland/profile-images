@@ -44,11 +44,12 @@ export async function createRetryConsumerComponent({
           return
         }
       } else {
-        logger.debug(`Giving up on entity="${result.entity} because of godot failure.`)
+        logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
         const failure = {
           commitHash,
           version,
-          entity: result.entity
+          entity: result.entity,
+          output: result.output
         }
         await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
       }

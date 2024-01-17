@@ -54,7 +54,7 @@ export async function createGodotSnapshotComponent({
 
   let executionNumber = 0
 
-  function run(input: any): Promise<void> {
+  function run(input: any): Promise<undefined | { stderr: string; stdout: string }> {
     return new Promise(async (resolve) => {
       // unique number for temp files
       executionNumber += 1
@@ -70,9 +70,12 @@ export async function createGodotSnapshotComponent({
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
-      exec(command, { timeout: 30_000 }, (_error, _stdout, _stderr) => {
+      exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         rmSync(avatarDataPath)
-        resolve()
+        if (error) {
+          return resolve({ stdout, stderr })
+        }
+        resolve(undefined)
       })
     })
   }
@@ -114,7 +117,7 @@ export async function createGodotSnapshotComponent({
 
     logger.debug(`Running godot to process ${payloads.length} avatars`)
     const start = Date.now()
-    await run(input)
+    const output = await run(input)
     const duration = Date.now() - start
 
     metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length)
@@ -123,6 +126,8 @@ export async function createGodotSnapshotComponent({
     for (const result of results) {
       if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
         result.success = true
+      } else {
+        result.output = output
       }
     }
 
