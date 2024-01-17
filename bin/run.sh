@@ -6,3 +6,5 @@ docker run -it --rm --network=host --env-file=.env --name=profiles -v ./dist:/ap
 
 docker build . -t profile-images
 docker run -it --rm --network=host --env-file=.env --name=profiles profile-images:latest
+
+docker build . -t profile-images && docker run -it --rm --network=host --env-file=.env --name=profiles profile-images:latest
