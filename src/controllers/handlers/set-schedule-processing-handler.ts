@@ -18,7 +18,7 @@ export async function scheduleProcessingHandler(
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }
 
-  await storage.deleteMultiple(body.map((entity: string) => `failure/${entity}.txt`))
+  await storage.deleteMultiple(body.map((entity: string) => `failures/${entity}.txt`))
 
   const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
     method: 'POST',
