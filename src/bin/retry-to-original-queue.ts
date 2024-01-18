@@ -51,7 +51,7 @@ async function main() {
       if (message.Body) {
         const sendCommand = new SendMessageCommand({
           QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(message.Body)
+          MessageBody: message.Body
         })
         await client.send(sendCommand)
       }
