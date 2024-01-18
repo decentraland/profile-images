@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { AvatarInfo } from '@dcl/schemas'
-import { globSync } from 'glob'
+import { globSync } from 'fast-glob'
 
 type GodotAvatarPayload = ExtendedAvatar & {
   destPath: string
