@@ -70,7 +70,8 @@ export async function initComponents(): Promise<AppComponents> {
     logs,
     godot,
     retryQueue,
-    storage
+    storage,
+    metrics
   })
 
   const jobProducer = await createProducerComponent({

@@ -6,8 +6,9 @@ export async function createRetryConsumerComponent({
   godot,
   storage,
   retryQueue,
-  config
-}: Pick<AppComponents, 'logs' | 'godot' | 'storage' | 'retryQueue' | 'config'>): Promise<QueueWorker> {
+  config,
+  metrics
+}: Pick<AppComponents, 'logs' | 'godot' | 'storage' | 'retryQueue' | 'config' | 'metrics'>): Promise<QueueWorker> {
   const logger = logs.getLogger('retry-consumer')
   let paused = false
 
@@ -44,6 +45,7 @@ export async function createRetryConsumerComponent({
           return
         }
       } else {
+        metrics.increment('snapshot_generation_failures', {}, 1)
         logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
         const failure = {
           commitHash,

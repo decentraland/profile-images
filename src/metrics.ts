@@ -10,6 +10,10 @@ export const metricDeclarations = {
     type: IMetricsComponent.HistogramType,
     buckets: [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30]
   },
+  snapshot_generation_failures: {
+    help: 'Count of snapshot generation failures',
+    type: IMetricsComponent.CounterType
+  },
   image_upload_duration_seconds: {
     help: 'Histogram of image upload duration',
     type: IMetricsComponent.HistogramType,
