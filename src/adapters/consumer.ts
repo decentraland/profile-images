@@ -20,25 +20,21 @@ export async function createConsumerComponent({
     config.getString('CURRENT_VERSION')
   ])
 
-  let paused = false
-  function setPaused(p: boolean): void {
-    paused = p
+  async function poll() {
+    let queueUrl = mainQueueUrl
+    let messages = await queueService.receive(queueUrl, { maxNumberOfMessages: maxJobs })
+    if (messages.length === 0) {
+      queueUrl = retryQueueUrl
+      messages = await queueService.receive(queueUrl, { maxNumberOfMessages: 1 })
+    }
+
+    return { queueUrl, messages }
   }
 
   async function start() {
     logger.debug('Starting consumer')
     while (true) {
-      if (paused) {
-        await sleep(60 * 1000)
-        continue
-      }
-
-      let queueUrl = mainQueueUrl
-      let messages = await queueService.receive(queueUrl, { maxNumberOfMessages: maxJobs })
-      if (messages.length === 0) {
-        queueUrl = retryQueueUrl
-        messages = await queueService.receive(queueUrl, { maxNumberOfMessages: 1 })
-      }
+      const { queueUrl, messages } = await poll()
 
       if (messages.length === 0) {
         await sleep(20 * 1000)

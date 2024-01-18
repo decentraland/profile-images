@@ -100,9 +100,7 @@ export type AvatarGenerationResult = ExtendedAvatar & {
   output?: { stderr: string; stdout: string }
 }
 
-export type QueueWorker = IBaseComponent & {
-  setPaused(paused: boolean): void
-}
+export type QueueWorker = IBaseComponent & {}
 
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>
