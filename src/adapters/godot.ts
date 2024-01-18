@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { AvatarInfo } from '@dcl/schemas'
+import { globSync } from 'glob'
 
 type GodotAvatarPayload = ExtendedAvatar & {
   destPath: string
@@ -73,6 +74,9 @@ export async function createGodotSnapshotComponent({
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         rmSync(avatarDataPath)
         if (error) {
+          for (const f of globSync('core.*')) {
+            rmSync(f)
+          }
           return resolve({ stdout, stderr })
         }
         resolve(undefined)
