@@ -69,7 +69,7 @@ export async function createGodotSnapshotComponent({
 
       await writeFile(avatarDataPath, JSON.stringify(input))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
+      logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         rmSync(avatarDataPath)
