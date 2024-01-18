@@ -7,9 +7,9 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
-import { Message } from '@aws-sdk/client-sqs'
 import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
+import { QueueService } from './adapters/queue'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -27,7 +27,6 @@ export type BaseComponents = {
   queue: QueueService
   retryQueue: QueueService
   consumer: QueueWorker
-  retryConsumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
 }
@@ -104,13 +103,6 @@ export type AvatarGenerationResult = ExtendedAvatar & {
 
 export type QueueSendOptions = {
   delay?: number
-}
-
-export type QueueService = {
-  send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
-  receive(max: number): Promise<Message[]>
-  deleteMessage(receiptHandle: string): Promise<void>
-  status(): Promise<Record<string, any>>
 }
 
 export type QueueWorker = IBaseComponent & {

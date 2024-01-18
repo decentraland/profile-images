@@ -8,12 +8,21 @@ export async function createConsumerComponent({
   godot,
   queue,
   storage,
-  retryQueue
-}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue'>): Promise<QueueWorker> {
+  retryQueue,
+  metrics
+}: Pick<
+  AppComponents,
+  'config' | 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue' | 'metrics'
+>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
-  let paused = false
 
+  const [commitHash, version] = await Promise.all([
+    config.getString('COMMIT_HASH'),
+    config.getString('CURRENT_VERSION')
+  ])
+
+  let paused = false
   function setPaused(p: boolean): void {
     paused = p
   }
@@ -26,7 +35,8 @@ export async function createConsumerComponent({
         continue
       }
 
-      const messages = await queue.receive(maxJobs)
+      const { messages } = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
+
       if (messages.length === 0) {
         continue
       }
@@ -67,6 +77,16 @@ export async function createConsumerComponent({
             logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
             continue
           }
+        } else if (messages.length === 1) {
+          metrics.increment('snapshot_generation_failures', {}, 1)
+          logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
+          const failure = {
+            commitHash,
+            version,
+            entity: result.entity,
+            output: result.output
+          }
+          await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
         } else {
           logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
           await retryQueue.send({ entity: result.entity, avatar: result.avatar })
