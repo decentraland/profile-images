@@ -35,7 +35,12 @@ export async function createConsumerComponent({
         continue
       }
 
-      const messages = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
+      const { name, messages } = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
+
+      function deleteMessage(message: Message) {
+        const q = name === queue.name ? queue : retryQueue
+        return q.deleteMessage(message.ReceiptHandle!)
+      }
 
       if (messages.length === 0) {
         continue
@@ -51,7 +56,7 @@ export async function createConsumerComponent({
           logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with undefined Body`
           )
-          await queue.deleteMessage(message.ReceiptHandle!)
+          await deleteMessage(message)
           continue
         }
         const body: ExtendedAvatar = JSON.parse(message.Body)
@@ -59,7 +64,7 @@ export async function createConsumerComponent({
           logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
           )
-          await queue.deleteMessage(message.ReceiptHandle!)
+          await deleteMessage(message)
           continue
         }
         messageByEntity.set(body.entity, message)
@@ -92,7 +97,7 @@ export async function createConsumerComponent({
           await retryQueue.send({ entity: result.entity, avatar: result.avatar })
         }
 
-        await queue.deleteMessage(message.ReceiptHandle!)
+        await deleteMessage(message)
       }
     }
   }

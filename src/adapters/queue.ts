@@ -9,8 +9,9 @@ import {
 import { AppComponents, ExtendedAvatar, QueueSendOptions } from '../types'
 
 export type QueueService = {
+  name: string
   send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
-  receive(max: number): Promise<Message[]>
+  receive(max: number): Promise<{ name: string; messages: Message[] }>
   deleteMessage(receiptHandle: string): Promise<void>
   status(): Promise<Record<string, any>>
 }
@@ -30,7 +31,7 @@ export async function createQueueComponent(
     await client.send(sendCommand)
   }
 
-  async function receive(max: number): Promise<Message[]> {
+  async function receive(max: number): Promise<{ name: string; messages: Message[] }> {
     const receiveCommand = new ReceiveMessageCommand({
       QueueUrl: queueName,
       MaxNumberOfMessages: max,
@@ -38,7 +39,7 @@ export async function createQueueComponent(
     })
     const { Messages = [] } = await client.send(receiveCommand)
 
-    return Messages
+    return { name: queueName, messages: Messages }
   }
 
   async function deleteMessage(receiptHandle: string) {
@@ -67,6 +68,7 @@ export async function createQueueComponent(
   }
 
   return {
+    name: queueName,
     send,
     receive,
     deleteMessage,
