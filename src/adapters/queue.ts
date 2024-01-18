@@ -6,7 +6,14 @@ import {
   SendMessageCommand,
   SQSClient
 } from '@aws-sdk/client-sqs'
-import { AppComponents, ExtendedAvatar, QueueSendOptions, QueueService } from '../types'
+import { AppComponents, ExtendedAvatar, QueueSendOptions } from '../types'
+
+export type QueueService = {
+  send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
+  receive(max: number): Promise<Message[]>
+  deleteMessage(receiptHandle: string): Promise<void>
+  status(): Promise<Record<string, any>>
+}
 
 export async function createQueueComponent(
   { awsConfig }: Pick<AppComponents, 'awsConfig'>,

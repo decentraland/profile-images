@@ -2,11 +2,11 @@ import { HandlerContextWithPath } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function adminHandler(
-  context: HandlerContextWithPath<'jobProducer' | 'logs' | 'consumer' | 'retryConsumer', '/tools'>
+  context: HandlerContextWithPath<'jobProducer' | 'logs' | 'consumer', '/tools'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { jobProducer, logs, consumer, retryConsumer }
+    components: { jobProducer, logs, consumer }
   } = context
 
   // TODO: add auth
@@ -21,14 +21,9 @@ export async function adminHandler(
 
   console.log(body)
 
-  if (typeof body.consumer !== 'undefined') {
-    consumer.setPaused(body.consumer)
-    logger.debug(`Consumer is now: ${body.consumer ? 'paused' : 'running'}`)
-  }
-
-  if (typeof body.retryConsumer !== 'undefined') {
-    retryConsumer.setPaused(body.retryConsumer)
-    logger.debug(`RetryConsumer is now: ${body.retryConsumer ? 'paused' : 'running'}`)
+  if (typeof body.pauseConsumer !== 'undefined') {
+    consumer.setPaused(body.pauseConsumer)
+    logger.debug(`Consumer is now: ${body.pauseConsumer ? 'paused' : 'running'}`)
   }
 
   return {
