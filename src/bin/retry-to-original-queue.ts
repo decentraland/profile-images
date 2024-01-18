@@ -9,7 +9,7 @@ import { createDotEnvConfigComponent } from '@well-known-components/env-config-p
 
 const REGION = 'us-east-1'
 
-export async function purgue(sqsClient: SQSClient, queueUrl: string) {
+export async function purge(sqsClient: SQSClient, queueUrl: string) {
   const command = new PurgeQueueCommand({
     QueueUrl: queueUrl
   })
