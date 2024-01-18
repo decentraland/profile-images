@@ -35,7 +35,7 @@ export async function createConsumerComponent({
         continue
       }
 
-      const { messages } = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
+      const messages = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
 
       if (messages.length === 0) {
         continue
