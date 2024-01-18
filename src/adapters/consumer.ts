@@ -6,18 +6,16 @@ export async function createConsumerComponent({
   config,
   logs,
   godot,
-  queue,
+  queueService,
   storage,
-  retryQueue,
   metrics
-}: Pick<
-  AppComponents,
-  'config' | 'logs' | 'godot' | 'queue' | 'storage' | 'retryQueue' | 'metrics'
->): Promise<QueueWorker> {
+}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'storage' | 'queueService' | 'metrics'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
 
-  const [commitHash, version] = await Promise.all([
+  const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
+    config.requireString('QUEUE_NAME'),
+    config.requireString('RETRY_QUEUE_NAME'),
     config.getString('COMMIT_HASH'),
     config.getString('CURRENT_VERSION')
   ])
@@ -35,14 +33,15 @@ export async function createConsumerComponent({
         continue
       }
 
-      const { name, messages } = await Promise.race([queue.receive(maxJobs), retryQueue.receive(1)])
-
-      function deleteMessage(message: Message) {
-        const q = name === queue.name ? queue : retryQueue
-        return q.deleteMessage(message.ReceiptHandle!)
+      let queueUrl = mainQueueUrl
+      let messages = await queueService.receive(queueUrl, { maxNumberOfMessages: maxJobs })
+      if (messages.length === 0) {
+        queueUrl = retryQueueUrl
+        messages = await queueService.receive(queueUrl, { maxNumberOfMessages: 1 })
       }
 
       if (messages.length === 0) {
+        await sleep(20 * 1000)
         continue
       }
 
@@ -56,7 +55,7 @@ export async function createConsumerComponent({
           logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with undefined Body`
           )
-          await deleteMessage(message)
+          await queueService.deleteMessage(queueUrl, message.ReceiptHandle!)
           continue
         }
         const body: ExtendedAvatar = JSON.parse(message.Body)
@@ -64,7 +63,7 @@ export async function createConsumerComponent({
           logger.warn(
             `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
           )
-          await deleteMessage(message)
+          await queueService.deleteMessage(queueUrl, message.ReceiptHandle!)
           continue
         }
         messageByEntity.set(body.entity, message)
@@ -94,10 +93,10 @@ export async function createConsumerComponent({
           await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
         } else {
           logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
-          await retryQueue.send({ entity: result.entity, avatar: result.avatar })
+          await queueService.send(retryQueueUrl, { entity: result.entity, avatar: result.avatar })
         }
 
-        await deleteMessage(message)
+        await queueService.deleteMessage(queueUrl, message.ReceiptHandle!)
       }
     }
   }

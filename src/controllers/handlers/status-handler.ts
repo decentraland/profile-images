@@ -2,18 +2,20 @@ import { HandlerContextWithPath, StatusResponse } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function statusHandler(
-  context: HandlerContextWithPath<'config' | 'queue' | 'retryQueue', '/status'>
+  context: HandlerContextWithPath<'config' | 'queueService', '/status'>
 ): Promise<IHttpServerComponent.IResponse> {
-  const { config } = context.components
+  const { config, queueService } = context.components
 
-  const [commitHash, version] = await Promise.all([
+  const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
+    config.requireString('QUEUE_NAME'),
+    config.requireString('RETRY_QUEUE_NAME'),
     config.getString('COMMIT_HASH'),
     config.getString('CURRENT_VERSION')
   ])
 
   const [queueStatus, retryQueueStatus] = await Promise.all([
-    context.components.queue.status(),
-    context.components.retryQueue.status()
+    queueService.status(mainQueueUrl),
+    queueService.status(retryQueueUrl)
   ])
 
   const status: StatusResponse = {

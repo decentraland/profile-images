@@ -24,8 +24,7 @@ export type BaseComponents = {
   jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  queue: QueueService
-  retryQueue: QueueService
+  queueService: QueueService
   consumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
@@ -99,10 +98,6 @@ export type AvatarGenerationResult = ExtendedAvatar & {
   avatarPath: string
   facePath: string
   output?: { stderr: string; stdout: string }
-}
-
-export type QueueSendOptions = {
-  delay?: number
 }
 
 export type QueueWorker = IBaseComponent & {
