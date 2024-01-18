@@ -97,5 +97,5 @@ export async function createConsumerComponent({
     }
   }
 
-  return { setPaused, start }
+  return { start }
 }
