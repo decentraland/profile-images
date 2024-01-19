@@ -24,8 +24,7 @@ export type BaseComponents = {
   jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  queue: QueueService
-  retryQueue: QueueService
+  queueService: QueueService
   consumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
@@ -101,13 +100,7 @@ export type AvatarGenerationResult = ExtendedAvatar & {
   output?: { stderr: string; stdout: string }
 }
 
-export type QueueSendOptions = {
-  delay?: number
-}
-
-export type QueueWorker = IBaseComponent & {
-  setPaused(paused: boolean): void
-}
+export type QueueWorker = IBaseComponent
 
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>

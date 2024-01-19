@@ -1,16 +1,19 @@
 import { Entity, Profile } from '@dcl/schemas'
-import { HandlerContextWithPath, InvalidRequestError, ExtendedAvatar } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
+import { HandlerContextWithPath, InvalidRequestError } from '../../types'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'logs' | 'queue' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'queueService' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, queue, storage, fetch, config }
+    components: { logs, queueService, storage, fetch, config }
   } = context
 
-  const peerUrl = await config.requireString('PEER_URL')
+  const [mainQueueUrl, peerUrl] = await Promise.all([
+    config.requireString('QUEUE_NAME'),
+    config.requireString('PEER_URL')
+  ])
   const logger = logs.getLogger('schedule-processing-handler')
 
   const body = await request.json()
@@ -29,8 +32,7 @@ export async function scheduleProcessingHandler(
 
   for (const entity of data) {
     const profile: Profile = entity.metadata
-    const message: ExtendedAvatar = { entity: entity.id, avatar: profile.avatars[0].avatar }
-    await queue.send(message)
+    await queueService.send(mainQueueUrl, { entity: entity.id, avatar: profile.avatars[0].avatar })
     logger.debug(`Added to queue entity="${entity.id}"`)
   }
 

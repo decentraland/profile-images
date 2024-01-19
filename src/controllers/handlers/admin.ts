@@ -6,7 +6,7 @@ export async function adminHandler(
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { jobProducer, logs, consumer }
+    components: { jobProducer, logs }
   } = context
 
   // TODO: add auth
@@ -17,13 +17,6 @@ export async function adminHandler(
   if (body.lastRun) {
     await jobProducer.changeLastRun(body.lastRun)
     logger.debug(`Setting last run to: ${body.lastRun}`)
-  }
-
-  console.log(body)
-
-  if (typeof body.pauseConsumer !== 'undefined') {
-    consumer.setPaused(body.pauseConsumer)
-    logger.debug(`Consumer is now: ${body.pauseConsumer ? 'paused' : 'running'}`)
   }
 
   return {

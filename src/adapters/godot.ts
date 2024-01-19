@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { AvatarInfo } from '@dcl/schemas'
-import { globSync } from 'glob'
+import { globSync } from 'fast-glob'
 
 type GodotAvatarPayload = ExtendedAvatar & {
   destPath: string
@@ -69,7 +69,7 @@ export async function createGodotSnapshotComponent({
 
       await writeFile(avatarDataPath, JSON.stringify(input))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      logger.debug(`about to exec, explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
+      logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
         rmSync(avatarDataPath)

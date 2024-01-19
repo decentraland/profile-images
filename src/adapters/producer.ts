@@ -23,13 +23,16 @@ type PointerChangesResponse = {
 export async function createProducerComponent({
   config,
   logs,
-  queue,
+  queueService,
   storage,
   fetch
-}: Pick<AppComponents, 'config' | 'logs' | 'queue' | 'storage' | 'fetch'>): Promise<JobProducer> {
+}: Pick<AppComponents, 'config' | 'logs' | 'queueService' | 'storage' | 'fetch'>): Promise<JobProducer> {
   const logger = logs.getLogger('producer')
-  const interval = parseInt(await config.requireString('INTERVAL'), 10)
-  const peerUrl = await config.requireString('PEER_URL')
+  const [mainQueueUrl, interval, peerUrl] = await Promise.all([
+    config.requireString('QUEUE_NAME'),
+    config.requireNumber('INTERVAL'),
+    config.requireString('PEER_URL')
+  ])
 
   let lastRun = Date.now() - interval
 
@@ -67,7 +70,7 @@ export async function createProducerComponent({
 
         for (const entity of activeEntities) {
           const message: ExtendedAvatar = { entity: entity.id, avatar: entity.metadata.avatars[0].avatar }
-          await queue.send(message)
+          await queueService.send(mainQueueUrl, message)
         }
 
         logger.debug(`Got ${activeEntities.length} active entities`)

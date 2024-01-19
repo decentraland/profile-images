@@ -6,53 +6,51 @@ import {
   SendMessageCommand,
   SQSClient
 } from '@aws-sdk/client-sqs'
-import { AppComponents, ExtendedAvatar, QueueSendOptions } from '../types'
+import { AppComponents, ExtendedAvatar } from '../types'
 
 export type QueueService = {
-  name: string
-  send(message: ExtendedAvatar, options?: QueueSendOptions): Promise<void>
-  receive(max: number): Promise<{ name: string; messages: Message[] }>
-  deleteMessage(receiptHandle: string): Promise<void>
-  status(): Promise<Record<string, any>>
+  send(queueUrl: string, message: ExtendedAvatar): Promise<void>
+  receive(queueUrl: string, options: { maxNumberOfMessages: number; waitTimeSeconds?: number }): Promise<Message[]>
+  deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>
+  status(queueUrl: string): Promise<Record<string, any>>
 }
 
-export async function createQueueComponent(
-  { awsConfig }: Pick<AppComponents, 'awsConfig'>,
-  queueName: string
-): Promise<QueueService> {
+export async function createQueueComponent({ awsConfig }: Pick<AppComponents, 'awsConfig'>): Promise<QueueService> {
   const client = new SQSClient(awsConfig)
 
-  async function send(message: ExtendedAvatar, options?: QueueSendOptions) {
+  async function send(queueUrl: string, message: ExtendedAvatar) {
     const sendCommand = new SendMessageCommand({
-      QueueUrl: queueName,
-      MessageBody: JSON.stringify(message),
-      DelaySeconds: options?.delay
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(message)
     })
     await client.send(sendCommand)
   }
 
-  async function receive(max: number): Promise<{ name: string; messages: Message[] }> {
+  async function receive(
+    queueUrl: string,
+    options: { maxNumberOfMessages: number; waitTimeSeconds?: number }
+  ): Promise<Message[]> {
     const receiveCommand = new ReceiveMessageCommand({
-      QueueUrl: queueName,
-      MaxNumberOfMessages: max,
-      WaitTimeSeconds: 20
+      QueueUrl: queueUrl,
+      MaxNumberOfMessages: options.maxNumberOfMessages,
+      WaitTimeSeconds: options.waitTimeSeconds
     })
     const { Messages = [] } = await client.send(receiveCommand)
 
-    return { name: queueName, messages: Messages }
+    return Messages
   }
 
-  async function deleteMessage(receiptHandle: string) {
+  async function deleteMessage(queueUrl: string, receiptHandle: string) {
     const deleteCommand = new DeleteMessageCommand({
-      QueueUrl: queueName,
+      QueueUrl: queueUrl,
       ReceiptHandle: receiptHandle
     })
     await client.send(deleteCommand)
   }
 
-  async function status(): Promise<Record<string, any>> {
+  async function status(queueUrl: string): Promise<Record<string, any>> {
     const command = new GetQueueAttributesCommand({
-      QueueUrl: queueName,
+      QueueUrl: queueUrl,
       AttributeNames: [
         'ApproximateNumberOfMessages',
         'ApproximateNumberOfMessagesNotVisible',
@@ -68,7 +66,6 @@ export async function createQueueComponent(
   }
 
   return {
-    name: queueName,
     send,
     receive,
     deleteMessage,
