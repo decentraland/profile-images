@@ -1,4 +1,4 @@
-import { GetQueueAttributesCommand, PurgeQueueCommand, SQSClient } from '@aws-sdk/client-sqs'
+import { PurgeQueueCommand, SQSClient } from '@aws-sdk/client-sqs'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 
 const REGION = 'us-east-1'
@@ -33,16 +33,7 @@ async function main() {
   const queues = [queueUrl, retryQueueUrl]
 
   for (const queueUrl of queues) {
-    const command = new GetQueueAttributesCommand({
-      QueueUrl: queueUrl,
-      AttributeNames: [
-        'ApproximateNumberOfMessages',
-        'ApproximateNumberOfMessagesNotVisible',
-        'ApproximateNumberOfMessagesDelayed'
-      ]
-    })
-    const response = await sqsClient.send(command)
-    console.log(queueUrl, response)
+    await purgue(sqsClient, queueUrl)
   }
 }
 
