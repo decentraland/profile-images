@@ -124,7 +124,7 @@ export async function createGodotSnapshotComponent({
     const output = await run(input)
     const duration = Date.now() - start
 
-    metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length)
+    metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length / 1000)
     logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
     for (const result of results) {

@@ -72,13 +72,14 @@ export async function createConsumerComponent({
       for (const result of results) {
         const message = messageByEntity.get(result.entity)!
         if (result.success) {
+          metrics.increment('snapshot_generation_count', { status: 'success' }, 1)
           const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
           if (!success) {
             logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
             continue
           }
         } else if (messages.length === 1) {
-          metrics.increment('snapshot_generation_failures', {}, 1)
+          metrics.increment('snapshot_generation_count', { status: 'failure' }, 1)
           logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
           const failure = {
             commitHash,
