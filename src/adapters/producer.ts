@@ -1,6 +1,7 @@
 import { AppComponents, JobProducer, ExtendedAvatar } from '../types'
 import { sleep } from '../logic/sleep'
 import { Entity, EntityType, Profile } from '@dcl/schemas'
+import { sqsSendMessage } from '../logic/queue'
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
 
@@ -23,10 +24,10 @@ type PointerChangesResponse = {
 export async function createProducerComponent({
   config,
   logs,
-  queueService,
+  sqsClient,
   storage,
   fetch
-}: Pick<AppComponents, 'config' | 'logs' | 'queueService' | 'storage' | 'fetch'>): Promise<JobProducer> {
+}: Pick<AppComponents, 'config' | 'logs' | 'sqsClient' | 'storage' | 'fetch'>): Promise<JobProducer> {
   const logger = logs.getLogger('producer')
   const [mainQueueUrl, interval, peerUrl] = await Promise.all([
     config.requireString('QUEUE_NAME'),
@@ -70,7 +71,7 @@ export async function createProducerComponent({
 
         for (const entity of activeEntities) {
           const message: ExtendedAvatar = { entity: entity.id, avatar: entity.metadata.avatars[0].avatar }
-          await queueService.send(mainQueueUrl, message)
+          await sqsSendMessage(sqsClient, mainQueueUrl, message)
         }
 
         logger.debug(`Got ${activeEntities.length} active entities`)

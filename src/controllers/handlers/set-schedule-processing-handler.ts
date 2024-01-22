@@ -1,13 +1,14 @@
 import { Entity, Profile } from '@dcl/schemas'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HandlerContextWithPath, InvalidRequestError } from '../../types'
+import { sqsSendMessage } from '../../logic/queue'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'logs' | 'queueService' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'sqsClient' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, queueService, storage, fetch, config }
+    components: { logs, sqsClient, storage, fetch, config }
   } = context
 
   const [mainQueueUrl, peerUrl] = await Promise.all([
@@ -32,7 +33,7 @@ export async function scheduleProcessingHandler(
 
   for (const entity of data) {
     const profile: Profile = entity.metadata
-    await queueService.send(mainQueueUrl, { entity: entity.id, avatar: profile.avatars[0].avatar })
+    await sqsSendMessage(sqsClient, mainQueueUrl, { entity: entity.id, avatar: profile.avatars[0].avatar })
     logger.debug(`Added to queue entity="${entity.id}"`)
   }
 
