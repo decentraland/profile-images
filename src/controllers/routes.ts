@@ -1,17 +1,20 @@
 import { Router } from '@well-known-components/http-server'
 import { GlobalContext } from '../types'
 import { statusHandler } from './handlers/status-handler'
-import { errorHandler } from './handlers/error-handler'
 import { scheduleProcessingHandler } from './handlers/set-schedule-processing-handler'
 import { adminHandler } from './handlers/admin'
+import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
 
-export async function setupRouter(_globalContext: GlobalContext): Promise<Router<GlobalContext>> {
+export async function setupRouter(globalContext: GlobalContext): Promise<Router<GlobalContext>> {
   const router = new Router<GlobalContext>()
 
   router.use(errorHandler)
 
-  router.post('/tools', adminHandler)
-  router.post('/schedule-processing', scheduleProcessingHandler)
+  const secret = await globalContext.components.config.getString('AUTH_SECRET')
+  if (secret) {
+    router.post('/tools', bearerTokenMiddleware(secret), adminHandler)
+    router.post('/schedule-processing', bearerTokenMiddleware(secret), scheduleProcessingHandler)
+  }
 
   router.get('/status', statusHandler)
 
