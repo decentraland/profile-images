@@ -9,7 +9,7 @@ import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createProducerComponent } from './adapters/producer'
 import { createGodotSnapshotComponent } from './adapters/godot'
-import { createQueueComponent } from './adapters/queue'
+import { createSQSClient } from './adapters/sqs'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -52,13 +52,13 @@ export async function initComponents(): Promise<AppComponents> {
     metrics
   })
 
-  const queueService = await createQueueComponent({ awsConfig })
+  const sqsClient = await createSQSClient({ awsConfig })
 
   const consumer = await createConsumerComponent({
     config,
     logs,
     godot,
-    queueService,
+    sqsClient,
     storage,
     metrics
   })
@@ -66,7 +66,7 @@ export async function initComponents(): Promise<AppComponents> {
   const jobProducer = await createProducerComponent({
     config,
     logs,
-    queueService,
+    sqsClient,
     storage,
     fetch
   })
@@ -79,7 +79,7 @@ export async function initComponents(): Promise<AppComponents> {
     jobProducer,
     logs,
     metrics,
-    queueService,
+    sqsClient,
     consumer,
     server,
     storage,

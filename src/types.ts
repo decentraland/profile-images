@@ -9,7 +9,8 @@ import type {
 import { metricDeclarations } from './metrics'
 import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
-import { QueueService } from './adapters/queue'
+import { SQSClient } from './adapters/sqs'
+import { Message } from '@aws-sdk/client-sqs'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -24,7 +25,7 @@ export type BaseComponents = {
   jobProducer: JobProducer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  queueService: QueueService
+  sqsClient: SQSClient
   consumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
@@ -100,7 +101,10 @@ export type AvatarGenerationResult = ExtendedAvatar & {
   output?: { stderr: string; stdout: string }
 }
 
-export type QueueWorker = IBaseComponent
+export type QueueWorker = IBaseComponent & {
+  process: (queueUrl: string, messages: Message[]) => Promise<void>
+  poll: () => Promise<{ queueUrl: string; messages: Message[] }>
+}
 
 export type JobProducer = IBaseComponent & {
   changeLastRun(ts: number): Promise<void>
