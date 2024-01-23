@@ -66,7 +66,7 @@ export async function createStorageComponent({
       Bucket: bucket,
       Delete: {
         Objects: entities.map((entity) => ({
-          Key: `${prefix}/failures/${entity}.text`
+          Key: `${prefix}/failures/${entity}.txt`
         }))
       }
     })
