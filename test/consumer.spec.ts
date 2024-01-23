@@ -2,11 +2,12 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createConsumerComponent } from '../src/adapters/consumer'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { ExtendedAvatar, IStorageComponent } from '../src/types'
+import { ExtendedAvatar } from '../src/types'
 import { GodotComponent } from '../src/adapters/godot'
 import { SQSClient } from '../src/adapters/sqs'
 import { ReceiveMessageCommand, Message } from '@aws-sdk/client-sqs'
 import { metricDeclarations } from '../src/metrics'
+import { IStorageComponent } from '../src/adapters/storage'
 
 const QUEUE_NAME = 'main-queue'
 const RETRY_QUEUE_NAME = 'retry-queue'
@@ -100,9 +101,9 @@ describe('Consumer test', function () {
       sendMessage
     } as any
 
-    const store = jest.fn()
+    const storeFailure = jest.fn()
     const storage: IStorageComponent = {
-      store
+      storeFailure
     } as any
 
     const consumer = await createConsumerComponent({
@@ -140,8 +141,8 @@ describe('Consumer test', function () {
       expect(ReceiptHandle).toEqual('0')
     }
 
-    expect(store).toHaveBeenCalledTimes(1)
-    expect(store.mock.calls[0][0]).toEqual('failures/0.txt')
+    expect(storeFailure).toHaveBeenCalledTimes(1)
+    expect(storeFailure.mock.calls[0][0]).toEqual('0')
   })
 
   it('process: call godot with multiple entity failure should requeue the messages individually', async () => {
