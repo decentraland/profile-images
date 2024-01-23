@@ -11,6 +11,8 @@ import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
 import { SQSClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
+import { Producer } from './adapters/producer'
+import { IStorageComponent } from './adapters/storage'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -22,7 +24,7 @@ export type BaseComponents = {
   config: IConfigComponent
   fetch: IFetchComponent
   godot: GodotComponent
-  jobProducer: JobProducer
+  producer: Producer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   sqsClient: SQSClient
@@ -82,13 +84,6 @@ export type AwsConfig = {
   forcePathStyle?: boolean
 }
 
-export type IStorageComponent = {
-  store(key: string, content: Buffer, contentType: string): Promise<void>
-  retrieve(key: string): Promise<Buffer | undefined>
-  deleteMultiple(keys: string[]): Promise<void>
-  storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
-}
-
 export type ExtendedAvatar = {
   entity: string
   avatar: AvatarInfo
@@ -104,8 +99,4 @@ export type AvatarGenerationResult = ExtendedAvatar & {
 export type QueueWorker = IBaseComponent & {
   process: (queueUrl: string, messages: Message[]) => Promise<void>
   poll: () => Promise<{ queueUrl: string; messages: Message[] }>
-}
-
-export type JobProducer = IBaseComponent & {
-  changeLastRun(ts: number): Promise<void>
 }

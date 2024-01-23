@@ -1,9 +1,8 @@
-import { AppComponents, JobProducer, ExtendedAvatar } from '../types'
+import { AppComponents, ExtendedAvatar } from '../types'
 import { sleep } from '../logic/sleep'
 import { Entity, EntityType, Profile } from '@dcl/schemas'
 import { sqsSendMessage } from '../logic/queue'
-
-const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
+import { IBaseComponent } from '@well-known-components/interfaces'
 
 type Delta = Omit<Entity, 'metadata' | 'id'> & { metadata: Profile; entityId: string; localTimestamp: number }
 
@@ -21,13 +20,18 @@ type PointerChangesResponse = {
   }
 }
 
+export type Producer = IBaseComponent & {
+  poll(lastTimestamp: number): Promise<number>
+  changeLastRun(ts: number): Promise<void>
+}
+
 export async function createProducerComponent({
   config,
   logs,
   sqsClient,
   storage,
   fetch
-}: Pick<AppComponents, 'config' | 'logs' | 'sqsClient' | 'storage' | 'fetch'>): Promise<JobProducer> {
+}: Pick<AppComponents, 'config' | 'logs' | 'sqsClient' | 'storage' | 'fetch'>): Promise<Producer> {
   const logger = logs.getLogger('producer')
   const [mainQueueUrl, interval, peerUrl] = await Promise.all([
     config.requireString('QUEUE_NAME'),
@@ -45,7 +49,7 @@ export async function createProducerComponent({
     const statusResponse = await fetch.fetch(`${peerUrl}/content/status`)
     const status = await statusResponse.json()
     if (status.synchronizationStatus.synchronizationState !== 'Syncing') {
-      logger.error('${peerUrl} is not syncing')
+      logger.error(`${peerUrl} is not syncing`)
       return lastTimestamp
     }
 
@@ -83,15 +87,15 @@ export async function createProducerComponent({
 
   async function changeLastRun(ts: number) {
     lastRun = ts
-    await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
+    await storage.storeLastCheckedTimestamp(lastRun)
   }
 
   async function start() {
     logger.info('Starting producer')
 
-    const contentBuffer = await storage.retrieve(LAST_CHECKED_TIMESTAMP_KEY)
-    if (contentBuffer) {
-      lastRun = parseInt(contentBuffer.toString())
+    const lastCheckedTs = await storage.retrieveLastCheckedTimestamp()
+    if (lastCheckedTs) {
+      lastRun = lastCheckedTs
     } else {
       logger.info(`Could not fetch last checked timestamp.`)
     }
@@ -100,7 +104,7 @@ export async function createProducerComponent({
     while (true) {
       try {
         lastRun = await poll(lastRun)
-        await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
+        await storage.storeLastCheckedTimestamp(lastRun)
       } catch (error: any) {
         logger.error(error)
       }
@@ -108,5 +112,5 @@ export async function createProducerComponent({
     }
   }
 
-  return { start, changeLastRun }
+  return { start, changeLastRun, poll }
 }

@@ -12,8 +12,6 @@ export async function createConsumerComponent({
   metrics
 }: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'storage' | 'sqsClient' | 'metrics'>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
-  const maxJobs = (await config.getNumber('MAX_JOBS')) || 10
-
   const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
     config.requireString('QUEUE_NAME'),
     config.requireString('RETRY_QUEUE_NAME'),
@@ -23,7 +21,7 @@ export async function createConsumerComponent({
 
   async function poll() {
     let queueUrl = mainQueueUrl
-    let messages = await sqsReceiveMessage(sqsClient, queueUrl, { maxNumberOfMessages: maxJobs })
+    let messages = await sqsReceiveMessage(sqsClient, queueUrl, { maxNumberOfMessages: 10 })
     if (messages.length === 0) {
       queueUrl = retryQueueUrl
       messages = await sqsReceiveMessage(sqsClient, queueUrl, { maxNumberOfMessages: 1 })
@@ -79,7 +77,7 @@ export async function createConsumerComponent({
           entity: result.entity,
           output: result.output
         }
-        await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
+        await storage.storeFailure(result.entity, JSON.stringify(failure))
       } else {
         logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
         await sqsSendMessage(sqsClient, retryQueueUrl, { entity: result.entity, avatar: result.avatar })
