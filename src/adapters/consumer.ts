@@ -77,7 +77,7 @@ export async function createConsumerComponent({
           entity: result.entity,
           output: result.output
         }
-        await storage.store(`failures/${result.entity}.txt`, Buffer.from(JSON.stringify(failure)), 'text/plain')
+        await storage.storeFailure(result.entity, JSON.stringify(failure))
       } else {
         logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
         await sqsSendMessage(sqsClient, retryQueueUrl, { entity: result.entity, avatar: result.avatar })

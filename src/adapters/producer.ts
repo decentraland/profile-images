@@ -4,8 +4,6 @@ import { Entity, EntityType, Profile } from '@dcl/schemas'
 import { sqsSendMessage } from '../logic/queue'
 import { IBaseComponent } from '@well-known-components/interfaces'
 
-const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
-
 type Delta = Omit<Entity, 'metadata' | 'id'> & { metadata: Profile; entityId: string; localTimestamp: number }
 
 type PointerChangesResponse = {
@@ -89,15 +87,15 @@ export async function createProducerComponent({
 
   async function changeLastRun(ts: number) {
     lastRun = ts
-    await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
+    await storage.storeLastCheckedTimestamp(lastRun)
   }
 
   async function start() {
     logger.info('Starting producer')
 
-    const contentBuffer = await storage.retrieve(LAST_CHECKED_TIMESTAMP_KEY)
-    if (contentBuffer) {
-      lastRun = parseInt(contentBuffer.toString(), 10)
+    const lastCheckedTs = await storage.retrieveLastCheckedTimestamp()
+    if (lastCheckedTs) {
+      lastRun = lastCheckedTs
     } else {
       logger.info(`Could not fetch last checked timestamp.`)
     }
@@ -106,7 +104,7 @@ export async function createProducerComponent({
     while (true) {
       try {
         lastRun = await poll(lastRun)
-        await storage.store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(lastRun.toString()), 'text/plain')
+        await storage.storeLastCheckedTimestamp(lastRun)
       } catch (error: any) {
         logger.error(error)
       }

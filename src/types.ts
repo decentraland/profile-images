@@ -12,6 +12,7 @@ import { AvatarInfo } from '@dcl/schemas'
 import { SQSClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { Producer } from './adapters/producer'
+import { IStorageComponent } from './adapters/storage'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -81,13 +82,6 @@ export type AwsConfig = {
   credentials?: { accessKeyId: string; secretAccessKey: string }
   endpoint?: string
   forcePathStyle?: boolean
-}
-
-export type IStorageComponent = {
-  store(key: string, content: Buffer, contentType: string): Promise<void>
-  retrieve(key: string): Promise<Buffer | undefined>
-  deleteMultiple(keys: string[]): Promise<void>
-  storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
 }
 
 export type ExtendedAvatar = {
