@@ -63,7 +63,7 @@ export async function initComponents(): Promise<AppComponents> {
     metrics
   })
 
-  const jobProducer = await createProducerComponent({
+  const producer = await createProducerComponent({
     config,
     logs,
     sqsClient,
@@ -76,7 +76,7 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     fetch,
     godot,
-    jobProducer,
+    producer,
     logs,
     metrics,
     sqsClient,

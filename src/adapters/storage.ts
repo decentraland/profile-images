@@ -12,6 +12,7 @@ export async function createStorageComponent({
   const logger = logs.getLogger('storage')
   const s3 = new S3Client(awsConfig)
   const bucket = await config.requireString('BUCKET_NAME')
+  const prefix = (await config.getString('S3_IMAGES_PREFIX')) || ''
 
   async function store(key: string, content: Buffer, contentType: string): Promise<void> {
     const timer = metrics.startTimer('image_upload_duration_seconds')
@@ -21,7 +22,7 @@ export async function createStorageComponent({
         client: s3,
         params: {
           Bucket: bucket,
-          Key: key,
+          Key: `${prefix}/${key}`,
           Body: content,
           ContentType: contentType
         }
@@ -40,7 +41,7 @@ export async function createStorageComponent({
       Bucket: bucket,
       Delete: {
         Objects: keys.map((key) => ({
-          Key: key
+          Key: `${prefix}/${key}`
         }))
       }
     })

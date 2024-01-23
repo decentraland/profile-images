@@ -11,6 +11,7 @@ import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
 import { SQSClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
+import { Producer } from './adapters/producer'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -22,7 +23,7 @@ export type BaseComponents = {
   config: IConfigComponent
   fetch: IFetchComponent
   godot: GodotComponent
-  jobProducer: JobProducer
+  producer: Producer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   sqsClient: SQSClient
@@ -104,8 +105,4 @@ export type AvatarGenerationResult = ExtendedAvatar & {
 export type QueueWorker = IBaseComponent & {
   process: (queueUrl: string, messages: Message[]) => Promise<void>
   poll: () => Promise<{ queueUrl: string; messages: Message[] }>
-}
-
-export type JobProducer = IBaseComponent & {
-  changeLastRun(ts: number): Promise<void>
 }
