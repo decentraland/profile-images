@@ -6,7 +6,7 @@ const REGION = 'us-east-1'
 
 async function main() {
   const config = await createDotEnvConfigComponent({
-    path: ['.env.default', '.env', '.env-admin']
+    path: ['.env.default', '.env', '.env.admin']
   })
 
   const [bucket, user, secret] = await Promise.all([

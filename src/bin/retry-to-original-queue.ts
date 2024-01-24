@@ -19,7 +19,7 @@ export async function purge(sqsClient: SQSClient, queueUrl: string) {
 
 async function main() {
   const config = await createDotEnvConfigComponent({
-    path: ['.env.default', '.env', '.env-admin']
+    path: ['.env.default', '.env', '.env.admin']
   })
   const [user, secret, queueUrl, retryQueueUrl] = await Promise.all([
     config.requireString('AWS_USER'),

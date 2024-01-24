@@ -3,7 +3,6 @@ import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
-import { AvatarInfo } from '@dcl/schemas'
 import { globSync } from 'fast-glob'
 
 type GodotAvatarPayload = ExtendedAvatar & {
@@ -19,30 +18,11 @@ export type GodotComponent = {
   generateImages(profiles: ExtendedAvatar[]): Promise<AvatarGenerationResult[]>
 }
 
-export function splitUrnAndTokenId(urnReceived: string) {
-  const urnLength = urnReceived.split(':').length
-
-  if (urnLength === 7) {
-    const lastColonIndex = urnReceived.lastIndexOf(':')
-    const urnValue = urnReceived.slice(0, lastColonIndex)
-    return { urn: urnValue, tokenId: urnReceived.slice(lastColonIndex + 1) }
-  } else {
-    return { urn: urnReceived, tokenId: undefined }
-  }
-}
-
 const outputPath = 'output'
 const width = 256
 const height = 512
 const faceWidth = 256
 const faceHeight = 256
-
-function normalizeUrns(avatar: AvatarInfo): AvatarInfo {
-  return {
-    ...avatar,
-    wearables: avatar.wearables.map((wearable: any) => splitUrnAndTokenId(wearable).urn)
-  }
-}
 
 export async function createGodotSnapshotComponent({
   logs,
@@ -99,7 +79,7 @@ export async function createGodotSnapshotComponent({
         faceDestPath,
         faceWidth,
         faceHeight,
-        avatar: normalizeUrns(avatar)
+        avatar
       })
       results.push({
         success: false,
