@@ -43,8 +43,8 @@ export async function createStorageComponent({
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
       await Promise.all([
-        store(`entities/${entity}/body.png`, body, 'image/png'),
-        store(`entities/${entity}/face.png`, face, 'image/png')
+        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
+        store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       ])
       return true
     } catch (err) {
