@@ -1,4 +1,4 @@
-import { _Object, ListObjectsV2Command, ListObjectsV2Request, S3Client } from '@aws-sdk/client-s3'
+import { ListObjectsV2Command, ListObjectsV2Request, S3Client } from '@aws-sdk/client-s3'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
 import { GetQueueAttributesCommand, SQSClient } from '@aws-sdk/client-sqs'
 
@@ -28,7 +28,7 @@ async function countObjects(s3: S3Client, bucket: string, prefix: string): Promi
 
 async function main() {
   const config = await createDotEnvConfigComponent({
-    path: ['.env.default', '.env', '.env-admin']
+    path: ['.env.default', '.env', '.env.admin']
   })
   const [bucket, user, secret, queueUrl, retryQueueUrl] = await Promise.all([
     config.requireString('S3_BUCKET'),

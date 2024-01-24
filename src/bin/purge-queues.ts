@@ -3,7 +3,7 @@ import { createDotEnvConfigComponent } from '@well-known-components/env-config-p
 
 const REGION = 'us-east-1'
 
-export async function purgue(sqsClient: SQSClient, queueUrl: string) {
+export async function purge(sqsClient: SQSClient, queueUrl: string) {
   const command = new PurgeQueueCommand({
     QueueUrl: queueUrl
   })
@@ -13,7 +13,7 @@ export async function purgue(sqsClient: SQSClient, queueUrl: string) {
 
 async function main() {
   const config = await createDotEnvConfigComponent({
-    path: ['.env.default', '.env', '.env-admin']
+    path: ['.env.default', '.env', '.env.admin']
   })
   const [user, secret, queueUrl, retryQueueUrl] = await Promise.all([
     config.requireString('AWS_USER'),
@@ -33,7 +33,7 @@ async function main() {
   const queues = [queueUrl, retryQueueUrl]
 
   for (const queueUrl of queues) {
-    await purgue(sqsClient, queueUrl)
+    await purge(sqsClient, queueUrl)
   }
 }
 
