@@ -1,4 +1,4 @@
-FROM quay.io/decentraland/godot-explorer:a027e05cd6c40ddf5c402cf93b59ccc7ebaddf0d
+FROM quay.io/decentraland/godot-explorer:6181223e24ddcfc5682296b828bf28f9bd67db91
 
 RUN apt-get install -y ca-certificates openssh-server
 
