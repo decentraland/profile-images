@@ -1,8 +1,8 @@
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { SQSClient } from '../src/adapters/sqs'
-import { createProducerComponent } from '../src/adapters/producer'
-import { IStorageComponent } from '../src/adapters/storage'
+import { SQSClient } from '../../src/adapters/sqs'
+import { createProducerComponent } from '../../src/adapters/producer'
+import { IStorageComponent } from '../../src/adapters/storage'
 
 const QUEUE_NAME = 'main-queue'
 
