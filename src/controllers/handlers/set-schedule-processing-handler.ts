@@ -1,7 +1,8 @@
 import { Entity, Profile } from '@dcl/schemas'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HandlerContextWithPath, InvalidRequestError } from '../../types'
+import { HandlerContextWithPath } from '../../types'
 import { sqsSendMessage } from '../../logic/queue'
+import { InvalidRequestError } from '@dcl/platform-server-commons'
 
 export async function scheduleProcessingHandler(
   context: HandlerContextWithPath<'logs' | 'sqsClient' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
