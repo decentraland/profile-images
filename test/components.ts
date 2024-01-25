@@ -36,6 +36,8 @@ async function initComponents(): Promise<TestComponents> {
   return {
     ...components,
     localFetch: await createLocalFetchCompoment(config),
+    consumer: {} as any,
+    producer: {} as any,
     metrics,
     sqsClient,
     storage
