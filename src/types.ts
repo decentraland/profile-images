@@ -13,6 +13,7 @@ import { SQSClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { Producer } from './adapters/producer'
 import { IStorageComponent } from './adapters/storage'
+import { AwsConfig } from './adapters/aws-config'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -61,13 +62,6 @@ export type StatusResponse = {
   commitHash: string
   version: string
   queues: any
-}
-
-export type AwsConfig = {
-  region: string
-  credentials?: { accessKeyId: string; secretAccessKey: string }
-  endpoint?: string
-  forcePathStyle?: boolean
 }
 
 export type ExtendedAvatar = {
