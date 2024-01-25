@@ -4,7 +4,7 @@ module.exports = {
     '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'test/tsconfig.json' }]
   },
   coverageDirectory: 'coverage',
-  collectCoverageFrom: ['src/**/*.ts', '!src/proto/**'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/bin/**'],
   testMatch: ['**/*.spec.(ts)'],
   testEnvironment: 'node'
 }

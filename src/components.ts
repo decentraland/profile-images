@@ -4,12 +4,12 @@ import { createLogComponent } from '@well-known-components/logger'
 import { createMetricsComponent, instrumentHttpServerWithMetrics } from '@well-known-components/metrics'
 import { AppComponents, AwsConfig, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
-import { createFetchComponent } from './adapters/fetch'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createProducerComponent } from './adapters/producer'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createSQSClient } from './adapters/sqs'
+import { createFetchComponent } from '@well-known-components/fetch-component'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -44,7 +44,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const storage = await createStorageComponent({ awsConfig, config, metrics, logs })
 
-  const fetch = await createFetchComponent()
+  const fetch = createFetchComponent()
 
   const godot = await createGodotSnapshotComponent({
     config,
