@@ -1,6 +1,6 @@
 import { _Object, ListObjectsV2Command, ListObjectsV2Request, S3Client } from '@aws-sdk/client-s3'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
-import { createFetchComponent } from '../adapters/fetch'
+import { createFetchComponent } from '@well-known-components/fetch-component'
 
 const REGION = 'us-east-1'
 
@@ -15,7 +15,7 @@ async function main() {
     config.requireString('AWS_SECRET')
   ])
 
-  const fetch = await createFetchComponent()
+  const fetch = createFetchComponent()
 
   const s3 = new S3Client({
     region: REGION,
