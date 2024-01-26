@@ -1893,7 +1893,7 @@
     "@types/node" "*"
     form-data "^4.0.0"
 
-"@types/node@*", "@types/node@^20.3.1", "@types/node@^20.8.8":
+"@types/node@*", "@types/node@^20.3.1":
   version "20.11.5"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-20.11.5.tgz#be10c622ca7fcaa3cf226cf80166abc31389d86e"
   integrity sha512-g557vgQjUUfN76MZAN/dt1z3dzcUsimuysco0KeluHgrPdJXkP/XdAURgyO2W9fZWHRtRBiVKzKn8vyOAwlG+w==
@@ -2073,7 +2073,7 @@
   dependencies:
     prom-client "^14.1.0"
 
-"@well-known-components/test-helpers@^1.5.3":
+"@well-known-components/test-helpers@^1.5.5":
   version "1.5.5"
   resolved "https://registry.yarnpkg.com/@well-known-components/test-helpers/-/test-helpers-1.5.5.tgz#73472e599a3e867889b03b226ea86c7aba1f4b6c"
   integrity sha512-TDUlPFh9Sog7vCXL+f30dhuBmoGH8ImGGP8mTB/pv25Qf9mF307uPhCklpDUWOB9HqUx/JkUp+0EAXmIDjNvcQ==

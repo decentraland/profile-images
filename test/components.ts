@@ -4,13 +4,15 @@
 import { createLocalFetchCompoment, createRunner } from '@well-known-components/test-helpers'
 
 import { main } from '../src/service'
-import { TestComponents } from '../src/types'
+import { QueueWorker, TestComponents } from '../src/types'
 import { initComponents as originalInitComponents } from '../src/components'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../src/metrics'
-import { createInMemoryStorage } from './mocks/storage-mock'
-import { createInMemorySqs } from './mocks/sqs-mock'
 import { Producer } from '../src/adapters/producer'
+import { IStorageComponent } from '../src/adapters/storage'
+import { IFetchComponent } from '@well-known-components/interfaces'
+import { SqsClient } from '../src/adapters/sqs'
+import { GetQueueAttributesCommand, GetQueueAttributesCommandOutput } from '@aws-sdk/client-sqs'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -27,29 +29,46 @@ export const test = createRunner<TestComponents>({
 async function initComponents(): Promise<TestComponents> {
   const components = await originalInitComponents()
 
-  const { config, logs } = components
+  const { config } = components
 
   const metrics = createTestMetricsComponent(metricDeclarations)
 
-  const storage = await createInMemoryStorage({ config, logs })
-  const sqsClient = createInMemorySqs()
+  const fetch: IFetchComponent = {
+    fetch: jest.fn()
+  }
+
+  const storage: IStorageComponent = {
+    storeImages: jest.fn(),
+    storeFailure: jest.fn(),
+    deleteFailures: jest.fn(),
+    retrieveLastCheckedTimestamp: jest.fn(),
+    storeLastCheckedTimestamp: jest.fn()
+  }
+
+  const sqsClient: SqsClient = {
+    sendMessage: jest.fn(),
+    receiveMessages: jest.fn(),
+    deleteMessage: jest.fn(),
+    getQueueAttributes: jest.fn()
+  }
+
+  const consumer: QueueWorker = {
+    poll: jest.fn(),
+    process: jest.fn()
+  }
+
+  const producer: Producer = {
+    changeLastRun: jest.fn(),
+    poll: jest.fn()
+  }
 
   return {
     ...components,
     localFetch: await createLocalFetchCompoment(config),
-    consumer: {} as any,
-    producer: {
-      changeLastRun: jest.fn(),
-      poll: jest.fn()
-    } as Producer,
-    //   changeLastRun(_ts: number): Promise<void> {
-    //     return Promise.resolve()
-    //   },
-    //   poll(lastTimestamp: number): Promise<number> {
-    //     return Promise.resolve(lastTimestamp + 1)
-    //   }
-    // } as Producer,
+    consumer,
+    fetch,
     metrics,
+    producer,
     sqsClient,
     storage
   }

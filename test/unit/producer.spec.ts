@@ -1,6 +1,6 @@
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { SQSClient } from '../../src/adapters/sqs'
+import { SqsClient } from '../../src/adapters/sqs'
 import { createProducerComponent } from '../../src/adapters/producer'
 import { IStorageComponent } from '../../src/adapters/storage'
 
@@ -13,7 +13,7 @@ describe('Producer test', function () {
     const logs = await createLogComponent({ config })
 
     const receiveMessages = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       receiveMessages
     } as any
 

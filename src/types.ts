@@ -9,7 +9,7 @@ import type {
 import { metricDeclarations } from './metrics'
 import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
-import { SQSClient } from './adapters/sqs'
+import { SqsClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { Producer } from './adapters/producer'
 import { IStorageComponent } from './adapters/storage'
@@ -28,7 +28,7 @@ export type BaseComponents = {
   producer: Producer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  sqsClient: SQSClient
+  sqsClient: SqsClient
   consumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent

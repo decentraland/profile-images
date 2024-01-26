@@ -1,4 +1,4 @@
-import { SQSClient } from '../../src/adapters/sqs'
+import { SqsClient } from '../../src/adapters/sqs'
 import {
   DeleteMessageCommand,
   DeleteMessageCommandOutput,
@@ -11,7 +11,7 @@ import {
 } from '@aws-sdk/client-sqs'
 import { randomUUID } from 'node:crypto'
 
-export function createInMemorySqs(): SQSClient {
+export function createInMemorySqs(): SqsClient {
   const storage: Map<string, any[]> = new Map()
 
   function sendMessage(payload: SendMessageCommand): Promise<SendMessageCommandOutput> {
