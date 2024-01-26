@@ -10,6 +10,7 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../src/metrics'
 import { createInMemoryStorage } from './mocks/storage-mock'
 import { createInMemorySqs } from './mocks/sqs-mock'
+import { Producer } from '../src/adapters/producer'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -37,7 +38,17 @@ async function initComponents(): Promise<TestComponents> {
     ...components,
     localFetch: await createLocalFetchCompoment(config),
     consumer: {} as any,
-    producer: {} as any,
+    producer: {
+      changeLastRun: jest.fn(),
+      poll: jest.fn()
+    } as Producer,
+    //   changeLastRun(_ts: number): Promise<void> {
+    //     return Promise.resolve()
+    //   },
+    //   poll(lastTimestamp: number): Promise<number> {
+    //     return Promise.resolve(lastTimestamp + 1)
+    //   }
+    // } as Producer,
     metrics,
     sqsClient,
     storage
