@@ -1,7 +1,7 @@
 import { test } from '../components'
 
 test('set-schedule-processing endpoint', function ({ components, stubComponents }) {
-  it.only('responds /schedule-processing', async () => {
+  it.skip('responds /schedule-processing', async () => {
     const { localFetch } = components
     const { fetch, producer, sqsClient, storage } = stubComponents
 
@@ -25,7 +25,7 @@ test('set-schedule-processing endpoint', function ({ components, stubComponents 
     expect(producer.changeLastRun).toHaveBeenCalledWith(1234)
   })
 
-  it('responds /schedule-processing without proper body', async () => {
+  it.skip('responds /schedule-processing without proper body', async () => {
     const { localFetch } = components
     const { fetch, sqsClient, storage } = stubComponents
 

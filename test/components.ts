@@ -13,6 +13,7 @@ import { IStorageComponent } from '../src/adapters/storage'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { SqsClient } from '../src/adapters/sqs'
 import { GetQueueAttributesCommand, GetQueueAttributesCommandOutput } from '@aws-sdk/client-sqs'
+import { createInMemorySqs } from './mocks/sqs-mock'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -45,12 +46,20 @@ async function initComponents(): Promise<TestComponents> {
     storeLastCheckedTimestamp: jest.fn()
   }
 
-  const sqsClient: SqsClient = {
-    sendMessage: jest.fn(),
-    receiveMessages: jest.fn(),
-    deleteMessage: jest.fn(),
-    getQueueAttributes: jest.fn()
-  }
+  // const sqsClient: SqsClient = {
+  //   sendMessage: jest.fn(),
+  //   receiveMessages: jest.fn(),
+  //   deleteMessage: jest.fn(),
+  //   getQueueAttributes: jest.fn().mockResolvedValue({
+  //     Attributes: {
+  //       ApproximateNumberOfMessages: '0',
+  //       ApproximateNumberOfMessagesDelayed: '0',
+  //       ApproximateNumberOfMessagesNotVisible: '0'
+  //     },
+  //     $metadata: {}
+  //   })
+  // }
+  const sqsClient: SqsClient = createInMemorySqs()
 
   const consumer: QueueWorker = {
     poll: jest.fn(),

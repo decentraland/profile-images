@@ -5,6 +5,6 @@ test('status endpoint', function ({ components }) {
     const { localFetch } = components
 
     const r = await localFetch.fetch('/status')
-    expect(r.status).toEqual(200)
+    expect(r.status).toBe(200)
   })
 })
