@@ -1,7 +1,7 @@
 import { HandlerContextWithPath } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
-export async function adminHandler(
+export async function toolsHandler(
   context: HandlerContextWithPath<'producer' | 'logs' | 'consumer', '/tools'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
