@@ -4,7 +4,7 @@ import { createConfigComponent } from '@well-known-components/env-config-provide
 import { createLogComponent } from '@well-known-components/logger'
 import { ExtendedAvatar } from '../../src/types'
 import { GodotComponent } from '../../src/adapters/godot'
-import { SQSClient } from '../../src/adapters/sqs'
+import { SqsClient } from '../../src/adapters/sqs'
 import { ReceiveMessageCommand, Message } from '@aws-sdk/client-sqs'
 import { metricDeclarations } from '../../src/metrics'
 import { IStorageComponent } from '../../src/adapters/storage'
@@ -24,7 +24,7 @@ describe('Consumer test', function () {
     }
 
     const receiveMessages = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       receiveMessages
     } as any
     const storage: IStorageComponent = {} as any
@@ -70,7 +70,7 @@ describe('Consumer test', function () {
     }
 
     const deleteMessage = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       deleteMessage
     } as any
     const storage: IStorageComponent = {} as any
@@ -96,7 +96,7 @@ describe('Consumer test', function () {
 
     const deleteMessage = jest.fn()
     const sendMessage = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       deleteMessage,
       sendMessage
     } as any
@@ -152,7 +152,7 @@ describe('Consumer test', function () {
 
     const deleteMessage = jest.fn()
     const sendMessage = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       deleteMessage,
       sendMessage
     } as any
@@ -220,7 +220,7 @@ describe('Consumer test', function () {
     const generateImages = jest.fn()
 
     const deleteMessage = jest.fn()
-    const sqsClient: SQSClient = {
+    const sqsClient: SqsClient = {
       deleteMessage
     } as any
 

@@ -11,14 +11,14 @@ import {
 import { SQSClient as AWS_SQSClient } from '@aws-sdk/client-sqs'
 import { AppComponents } from '../types'
 
-export type SQSClient = {
+export type SqsClient = {
   sendMessage(payload: SendMessageCommand): Promise<SendMessageCommandOutput>
   getQueueAttributes(payload: GetQueueAttributesCommand): Promise<GetQueueAttributesCommandOutput>
   receiveMessages(payload: ReceiveMessageCommand): Promise<ReceiveMessageCommandOutput>
   deleteMessage(payload: DeleteMessageCommand): Promise<DeleteMessageCommandOutput>
 }
 
-export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsConfig'>): Promise<SQSClient> {
+export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsConfig'>): Promise<SqsClient> {
   const client = new AWS_SQSClient(awsConfig)
 
   function sendMessage(payload: SendMessageCommand): Promise<SendMessageCommandOutput> {

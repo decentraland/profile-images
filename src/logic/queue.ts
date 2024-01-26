@@ -6,9 +6,9 @@ import {
   SendMessageCommand
 } from '@aws-sdk/client-sqs'
 import { ExtendedAvatar } from '../types'
-import { SQSClient } from '../adapters/sqs'
+import { SqsClient } from '../adapters/sqs'
 
-export async function sqsSendMessage(client: SQSClient, queueUrl: string, message: ExtendedAvatar) {
+export async function sqsSendMessage(client: SqsClient, queueUrl: string, message: ExtendedAvatar) {
   const sendCommand = new SendMessageCommand({
     QueueUrl: queueUrl,
     MessageBody: JSON.stringify(message)
@@ -17,7 +17,7 @@ export async function sqsSendMessage(client: SQSClient, queueUrl: string, messag
 }
 
 export async function sqsReceiveMessage(
-  client: SQSClient,
+  client: SqsClient,
   queueUrl: string,
   options: { maxNumberOfMessages: number; waitTimeSeconds?: number }
 ): Promise<Message[]> {
@@ -31,7 +31,7 @@ export async function sqsReceiveMessage(
   return Messages
 }
 
-export async function sqsDeleteMessage(client: SQSClient, queueUrl: string, receiptHandle: string) {
+export async function sqsDeleteMessage(client: SqsClient, queueUrl: string, receiptHandle: string) {
   const deleteCommand = new DeleteMessageCommand({
     QueueUrl: queueUrl,
     ReceiptHandle: receiptHandle
@@ -39,7 +39,7 @@ export async function sqsDeleteMessage(client: SQSClient, queueUrl: string, rece
   await client.deleteMessage(deleteCommand)
 }
 
-export async function sqsStatus(client: SQSClient, queueUrl: string): Promise<Record<string, any>> {
+export async function sqsStatus(client: SqsClient, queueUrl: string): Promise<Record<string, any>> {
   const command = new GetQueueAttributesCommand({
     QueueUrl: queueUrl,
     AttributeNames: [
