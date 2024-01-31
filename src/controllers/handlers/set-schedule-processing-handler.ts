@@ -25,17 +25,18 @@ export async function scheduleProcessingHandler(
 
   await storage.deleteFailures(body)
 
-  const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
-    method: 'POST',
-    body: JSON.stringify({ ids: body })
-  })
+  const response = await fetch.fetch(
+    `${peerUrl}/content/deployments?` +
+      new URLSearchParams([['entityType', 'profile'], ...body.map((entityId) => ['entityId', entityId])]),
+    {}
+  )
 
-  const data: Entity[] = await response.json()
+  const data: { deployments: (Entity & { entityId: string })[] } = await response.json()
 
-  for (const entity of data) {
+  for (const entity of data.deployments) {
     const profile: Profile = entity.metadata
-    await sqsSendMessage(sqsClient, mainQueueUrl, { entity: entity.id, avatar: profile.avatars[0].avatar })
-    logger.debug(`Added to queue entity="${entity.id}"`)
+    await sqsSendMessage(sqsClient, mainQueueUrl, { entity: entity.entityId, avatar: profile.avatars[0].avatar })
+    logger.debug(`Added to queue entity="${entity.entityId}"`)
   }
 
   return {
