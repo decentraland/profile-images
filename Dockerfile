@@ -1,4 +1,4 @@
-FROM quay.io/decentraland/godot-explorer:6181223e24ddcfc5682296b828bf28f9bd67db91
+FROM quay.io/decentraland/godot-explorer:4ec80f089a7f149591e2d37fe7f40a1d9ff3431d
 
 RUN apt-get install -y ca-certificates
 
