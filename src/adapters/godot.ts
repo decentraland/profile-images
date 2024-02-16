@@ -35,11 +35,8 @@ export async function createGodotSnapshotComponent({
 
   let executionNumber = 0
 
-  function run(input: any): Promise<undefined | { stderr: string; stdout: string }> {
+  function run(input: any, executionNumber: number): Promise<undefined | { stderr: string; stdout: string }> {
     return new Promise(async (resolve) => {
-      // unique number for temp files
-      executionNumber += 1
-
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
 
       await writeFile(avatarDataPath, JSON.stringify(input))
@@ -63,6 +60,7 @@ export async function createGodotSnapshotComponent({
     const payloads: GodotAvatarPayload[] = []
     const results: AvatarGenerationResult[] = []
 
+    executionNumber += 1
     const outputPath = `${prefix}_${executionNumber}`
     await mkdir(outputPath)
 
@@ -99,7 +97,7 @@ export async function createGodotSnapshotComponent({
 
     logger.debug(`Running godot to process ${payloads.length} avatars`)
     const start = Date.now()
-    const output = await run(input)
+    const output = await run(input, executionNumber)
     const duration = Date.now() - start
 
     metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length / 1000)
