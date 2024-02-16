@@ -53,8 +53,8 @@ export async function createConsumerComponent({
         return
       }
 
-      // NOTE: we are already processing this entity in the batch
       if (messageByEntity.has(body.entity)) {
+        // NOTE: we are already processing this entity in the batch
         await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
         continue
       }
