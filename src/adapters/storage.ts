@@ -46,7 +46,6 @@ export async function createStorageComponent({
         store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
         store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       ])
-      logger.debug(`Images uploaded for: "${entity}"`)
       return true
     } catch (err) {
       status = 'error'
