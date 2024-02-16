@@ -52,6 +52,13 @@ export async function createConsumerComponent({
         await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
         return
       }
+
+      if (messageByEntity.has(body.entity)) {
+        // NOTE: we are already processing this entity in the batch
+        await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
+        continue
+      }
+
       messageByEntity.set(body.entity, message)
 
       input.push(body)

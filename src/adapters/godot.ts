@@ -1,7 +1,7 @@
+import path from 'path'
 import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
-import { existsSync, mkdirSync, rmSync } from 'fs'
-import path from 'path'
+import { stat, mkdir, rm } from 'fs/promises'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { globSync } from 'fast-glob'
 
@@ -37,25 +37,20 @@ export async function createGodotSnapshotComponent({
 
   function run(input: any): Promise<undefined | { stderr: string; stdout: string }> {
     return new Promise(async (resolve) => {
-      // unique number for temp files
       executionNumber += 1
-
-      // create directory if exists
-      if (!existsSync(outputPath)) {
-        mkdirSync(outputPath)
-      }
-
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
+
+      await mkdir(outputPath, { recursive: true })
 
       await writeFile(avatarDataPath, JSON.stringify(input))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
-        rmSync(avatarDataPath)
+        rm(avatarDataPath).catch(logger.error)
         if (error) {
           for (const f of globSync('core.*')) {
-            rmSync(f)
+            rm(f).catch(logger.error)
           }
           return resolve({ stdout, stderr })
         }
@@ -69,7 +64,7 @@ export async function createGodotSnapshotComponent({
     const results: AvatarGenerationResult[] = []
 
     for (const { entity, avatar } of avatars) {
-      const destPath = path.join(outputPath, `${entity}.png`)
+      const destPath = path.join(outputPath, `${entity}_body.png`)
       const faceDestPath = path.join(outputPath, `${entity}_face.png`)
       payloads.push({
         entity,
@@ -108,9 +103,11 @@ export async function createGodotSnapshotComponent({
     logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
     for (const result of results) {
-      if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
+      try {
+        await Promise.all([stat(result.avatarPath), stat(result.facePath)])
         result.success = true
-      } else {
+      } catch (err: any) {
+        logger.error(err)
         result.output = output
       }
     }

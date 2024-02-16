@@ -7,8 +7,8 @@ contents
 .env.admin
 yarn-error.log
 .vscode
-output
 localstack
 compare
 entities
 explorer
+output

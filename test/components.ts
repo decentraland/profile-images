@@ -12,7 +12,6 @@ import { Producer } from '../src/adapters/producer'
 import { IStorageComponent } from '../src/adapters/storage'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { SqsClient } from '../src/adapters/sqs'
-import { GetQueueAttributesCommand, GetQueueAttributesCommandOutput } from '@aws-sdk/client-sqs'
 import { createInMemorySqs } from './mocks/sqs-mock'
 
 /**
