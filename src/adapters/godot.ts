@@ -1,7 +1,7 @@
+import path from 'path'
 import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { stat, mkdir, rm } from 'fs/promises'
-import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { globSync } from 'fast-glob'
 
@@ -18,7 +18,7 @@ export type GodotComponent = {
   generateImages(profiles: ExtendedAvatar[]): Promise<AvatarGenerationResult[]>
 }
 
-const prefix = 'output'
+const outputPath = 'output'
 const width = 256
 const height = 512
 const faceWidth = 256
@@ -35,9 +35,12 @@ export async function createGodotSnapshotComponent({
 
   let executionNumber = 0
 
-  function run(input: any, executionNumber: number): Promise<undefined | { stderr: string; stdout: string }> {
+  function run(input: any): Promise<undefined | { stderr: string; stdout: string }> {
     return new Promise(async (resolve) => {
+      executionNumber += 1
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
+
+      await mkdir(outputPath, { recursive: true })
 
       await writeFile(avatarDataPath, JSON.stringify(input))
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
@@ -59,10 +62,6 @@ export async function createGodotSnapshotComponent({
   async function generateImages(avatars: ExtendedAvatar[]): Promise<AvatarGenerationResult[]> {
     const payloads: GodotAvatarPayload[] = []
     const results: AvatarGenerationResult[] = []
-
-    executionNumber += 1
-    const outputPath = `${prefix}_${executionNumber}`
-    await mkdir(outputPath)
 
     for (const { entity, avatar } of avatars) {
       const destPath = path.join(outputPath, `${entity}_body.png`)
@@ -97,7 +96,7 @@ export async function createGodotSnapshotComponent({
 
     logger.debug(`Running godot to process ${payloads.length} avatars`)
     const start = Date.now()
-    const output = await run(input, executionNumber)
+    const output = await run(input)
     const duration = Date.now() - start
 
     metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length / 1000)
