@@ -33,5 +33,4 @@ ENV NODE_ENV production
 #            and: https://www.ctl.io/developers/blog/post/gracefully-stopping-docker-containers/
 #ENTRYPOINT ["/usr/bin/tini", "--"]
 # Run the program under Tini
-ENTRYPOINT [ "/bin/bash", "/app/entrypoint.sh" ]
-#ENTRYPOINT  [ "/usr/local/bin/node", "--trace-warnings", "--abort-on-uncaught-exception", "--unhandled-rejections=strict", "dist/index.js" ]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh" ]

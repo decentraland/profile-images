@@ -1,6 +1,7 @@
 import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { existsSync, mkdirSync, rmSync } from 'fs'
+import { access, constants } from 'fs/promises'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { globSync } from 'fast-glob'
@@ -69,7 +70,7 @@ export async function createGodotSnapshotComponent({
     const results: AvatarGenerationResult[] = []
 
     for (const { entity, avatar } of avatars) {
-      const destPath = path.join(outputPath, `${entity}.png`)
+      const destPath = path.join(outputPath, `${entity}_body.png`)
       const faceDestPath = path.join(outputPath, `${entity}_face.png`)
       payloads.push({
         entity,
@@ -109,7 +110,12 @@ export async function createGodotSnapshotComponent({
 
     for (const result of results) {
       if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-        result.success = true
+        try {
+          await access(result.avatarPath, constants.R_OK)
+          result.success = true
+        } catch (err) {
+          logger.error(`No permissions to read ${result.avatarPath}`)
+        }
       } else {
         result.output = output
       }
