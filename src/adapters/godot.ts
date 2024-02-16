@@ -1,7 +1,6 @@
 import { exec } from 'child_process'
 import { writeFile } from 'fs/promises'
-import { existsSync, mkdirSync, rmSync } from 'fs'
-import { access, constants } from 'fs/promises'
+import { stat, mkdir, rm } from 'fs/promises'
 import path from 'path'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
 import { globSync } from 'fast-glob'
@@ -48,10 +47,10 @@ export async function createGodotSnapshotComponent({
       logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
       exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
-        rmSync(avatarDataPath)
+        rm(avatarDataPath).catch(logger.error)
         if (error) {
           for (const f of globSync('core.*')) {
-            rmSync(f)
+            rm(f).catch(logger.error)
           }
           return resolve({ stdout, stderr })
         }
@@ -65,7 +64,7 @@ export async function createGodotSnapshotComponent({
     const results: AvatarGenerationResult[] = []
 
     const outputPath = `${prefix}_${executionNumber}`
-    mkdirSync(outputPath)
+    await mkdir(outputPath)
 
     for (const { entity, avatar } of avatars) {
       const destPath = path.join(outputPath, `${entity}_body.png`)
@@ -107,10 +106,10 @@ export async function createGodotSnapshotComponent({
     logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
 
     for (const result of results) {
-      if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-        await access(result.avatarPath, constants.R_OK)
+      try {
+        await Promise.all([stat(result.avatarPath), stat(result.facePath)])
         result.success = true
-      } else {
+      } catch {
         result.output = output
       }
     }
