@@ -109,7 +109,8 @@ export async function createGodotSnapshotComponent({
       try {
         await Promise.all([stat(result.avatarPath), stat(result.facePath)])
         result.success = true
-      } catch {
+      } catch (err: any) {
+        logger.error(err)
         result.output = output
       }
     }
