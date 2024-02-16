@@ -19,7 +19,7 @@ export type GodotComponent = {
   generateImages(profiles: ExtendedAvatar[]): Promise<AvatarGenerationResult[]>
 }
 
-const outputPath = 'output'
+const prefix = 'output'
 const width = 256
 const height = 512
 const faceWidth = 256
@@ -40,11 +40,6 @@ export async function createGodotSnapshotComponent({
     return new Promise(async (resolve) => {
       // unique number for temp files
       executionNumber += 1
-
-      // create directory if exists
-      if (!existsSync(outputPath)) {
-        mkdirSync(outputPath)
-      }
 
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
 
@@ -68,6 +63,9 @@ export async function createGodotSnapshotComponent({
   async function generateImages(avatars: ExtendedAvatar[]): Promise<AvatarGenerationResult[]> {
     const payloads: GodotAvatarPayload[] = []
     const results: AvatarGenerationResult[] = []
+
+    const outputPath = `${prefix}_${executionNumber}`
+    mkdirSync(outputPath)
 
     for (const { entity, avatar } of avatars) {
       const destPath = path.join(outputPath, `${entity}_body.png`)
