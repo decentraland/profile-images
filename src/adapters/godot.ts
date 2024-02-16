@@ -108,12 +108,8 @@ export async function createGodotSnapshotComponent({
 
     for (const result of results) {
       if (existsSync(result.avatarPath) && existsSync(result.facePath)) {
-        try {
-          await access(result.avatarPath, constants.R_OK)
-          result.success = true
-        } catch (err) {
-          logger.error(`No permissions to read ${result.avatarPath}`)
-        }
+        await access(result.avatarPath, constants.R_OK)
+        result.success = true
       } else {
         result.output = output
       }
