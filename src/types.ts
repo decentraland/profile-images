@@ -1,7 +1,7 @@
-import type { IFetchComponent } from '@well-known-components/http-server'
 import type {
   IBaseComponent,
   IConfigComponent,
+  IFetchComponent,
   IHttpServerComponent,
   ILoggerComponent,
   IMetricsComponent
