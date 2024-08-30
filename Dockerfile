@@ -1,6 +1,7 @@
 FROM quay.io/decentraland/godot-explorer:4fa8e16a3fdf649fd6b7323adfc4298981762c7a
 
-RUN apt-get install -y ca-certificates tini
+RUN apt-get update && apt-get upgrade -y
+RUN install -y ca-certificates tini
 
 # Install node
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x  | bash - && apt-get -y install nodejs
