@@ -1,5 +1,7 @@
 ### Profile Images
 
+This project generates profile images from users' 3D avatar models, producing both body and face images. These images are exposed via an API, allowing them to be seamlessly integrated into any desired application. 
+
 The profile image services consists of two services:
 
 - **Producer**: polls a target catalyst to fetch the latest profiles that have changes, and it adds them as jobs into SQS.
