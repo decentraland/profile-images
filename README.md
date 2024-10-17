@@ -1,5 +1,7 @@
 ### Profile Images
 
+[![Coverage Status](https://coveralls.io/repos/github/decentraland/profile-images/badge.svg?branch=coverage)](https://coveralls.io/github/decentraland/profile-images?branch=coverage)
+
 This project generates profile images from users' 3D avatar models, producing both body and face images. These images are exposed via an API, allowing them to be seamlessly integrated into any desired application. 
 
 The profile image services consists of two services:
