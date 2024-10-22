@@ -2,6 +2,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
 import { sleep } from '../logic/sleep'
 import { sqsDeleteMessage, sqsReceiveMessage, sqsSendMessage } from '../logic/queue'
+import { writeFile } from 'fs/promises'
 
 export async function createConsumerComponent({
   config,
@@ -87,6 +88,11 @@ export async function createConsumerComponent({
         await storage.storeFailure(result.entity, JSON.stringify(failure))
       } else {
         logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
+
+        // log the failure into disk (reuslt.output.stderr && result.output.stdout)
+        const failureFilePath = `failure-${result.entity}.json`
+        await writeFile(failureFilePath, JSON.stringify(result.output))
+
         await sqsSendMessage(sqsClient, retryQueueUrl, { entity: result.entity, avatar: result.avatar })
       }
 
