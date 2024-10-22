@@ -89,9 +89,11 @@ export async function createConsumerComponent({
       } else {
         logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
 
-        // log the failure into disk (reuslt.output.stderr && result.output.stdout)
-        const failureFilePath = `failure-${result.entity}.json`
-        await writeFile(failureFilePath, JSON.stringify(result.output))
+        if (result.output !== undefined) {
+          // log the failure into disk (reuslt.output.stderr && result.output.stdout)
+          const failureFilePath = `failure-${result.entity}.json`
+          await writeFile(failureFilePath, JSON.stringify(result.output))
+        }
 
         await sqsSendMessage(sqsClient, retryQueueUrl, { entity: result.entity, avatar: result.avatar })
       }
