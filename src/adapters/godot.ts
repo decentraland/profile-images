@@ -46,7 +46,7 @@ export async function createGodotSnapshotComponent({
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
 
-      exec(command, { timeout: 30_000 }, (error, stdout, stderr) => {
+      const childProcess = exec(command, { timeout: 45_000 }, (error, stdout, stderr) => {
         rm(avatarDataPath).catch(logger.error)
         if (error) {
           for (const f of globSync('core.*')) {
@@ -55,6 +55,13 @@ export async function createGodotSnapshotComponent({
           return resolve({ stdout, stderr })
         }
         resolve(undefined)
+      })
+
+      childProcess.on('close', (_code, signal) => {
+        // timeout sends SIGTERM, we might want to kill it harder
+        if (signal === 'SIGTERM') {
+          childProcess.kill('SIGKILL')
+        }
       })
     })
   }
