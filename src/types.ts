@@ -73,7 +73,6 @@ export type AvatarGenerationResult = ExtendedAvatar & {
   success: boolean
   avatarPath: string
   facePath: string
-  output?: { stderr: string; stdout: string }
 }
 
 export type QueueWorker = IBaseComponent & {
