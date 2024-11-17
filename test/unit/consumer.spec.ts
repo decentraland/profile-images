@@ -123,13 +123,15 @@ describe('Consumer test', function () {
     ]
 
     generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return input.map(({ avatar, entity }: ExtendedAvatar) => ({
-        avatar,
-        entity,
-        success: false,
-        avatarPath: 'avatar0.png',
-        facePath: 'face0.png'
-      }))
+      return {
+        avatars: input.map(({ avatar, entity }: ExtendedAvatar) => ({
+          avatar,
+          entity,
+          success: false,
+          avatarPath: 'avatar0.png',
+          facePath: 'face0.png'
+        }))
+      }
     })
 
     await consumer.process(QUEUE_NAME, messages)
@@ -180,13 +182,15 @@ describe('Consumer test', function () {
     ]
 
     generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
-        avatar,
-        entity,
-        success: false,
-        avatarPath: `avatar${i}.png`,
-        facePath: `face${i}.png`
-      }))
+      return {
+        avatars: input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
+          avatar,
+          entity,
+          success: false,
+          avatarPath: `avatar${i}.png`,
+          facePath: `face${i}.png`
+        }))
+      }
     })
 
     await consumer.process(QUEUE_NAME, messages)
@@ -250,13 +254,15 @@ describe('Consumer test', function () {
     ]
 
     generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
-        avatar,
-        entity,
-        success: true,
-        avatarPath: `avatar${i}.png`,
-        facePath: `face${i}.png`
-      }))
+      return {
+        avatars: input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
+          avatar,
+          entity,
+          success: true,
+          avatarPath: `avatar${i}.png`,
+          facePath: `face${i}.png`
+        }))
+      }
     })
 
     await consumer.process(QUEUE_NAME, messages)
