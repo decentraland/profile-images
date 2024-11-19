@@ -37,6 +37,8 @@ export async function createGodotSnapshotComponent({
   const peerUrl = await config.requireString('PEER_URL')
   const logger = logs.getLogger('godot-snapshot')
   const explorerPath = process.env.EXPLORER_PATH || '.'
+  const baseTime = (await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000
+  const timePerAvatar = (await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000
 
   let executionNumber = 0
 
@@ -44,24 +46,36 @@ export async function createGodotSnapshotComponent({
     return new Promise(async (resolve) => {
       executionNumber += 1
 
-      const timeout = 15_000 + input.payload.length * 10_000
+      const timeout = baseTime + input.payload.length * timePerAvatar
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(input))
 
       await mkdir(outputPath, { recursive: true })
       const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      logger.debug(`about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}`)
+      logger.debug(
+        `about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}, timeout: ${timeout}`
+      )
+
+      let resolved = false
 
       const childProcess = exec(command, { timeout }, (error, stdout, stderr) => {
+        if (resolved) {
+          return
+        }
+
         rm(avatarDataPath).catch(logger.error)
         if (error) {
           for (const f of globSync('core.*')) {
             rm(f).catch(logger.error)
           }
+          resolved = true
           return resolve({ error: true, stdout, stderr })
         }
+        resolved = true
         resolve({ error: false, stdout, stderr })
       })
+
+      const childProcessPid = childProcess.pid
 
       childProcess.on('close', (_code, signal) => {
         // timeout sends SIGTERM, we might want to kill it harder
@@ -69,6 +83,14 @@ export async function createGodotSnapshotComponent({
           childProcess.kill('SIGKILL')
         }
       })
+
+      setTimeout(() => {
+        exec(`kill -9 ${childProcessPid}`, () => {})
+        if (!resolved) {
+          resolve({ error: true, stdout: '', stderr: 'timeout' })
+          resolved = true
+        }
+      }, timeout + 5_000)
     })
   }
 
