@@ -9,7 +9,7 @@ export async function scheduleProcessingHandler(
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, sqsClient, storage, fetch, config }
+    components: { logs, sqsClient, storage: _storage, fetch, config }
   } = context
 
   const [mainQueueUrl, peerUrl] = await Promise.all([
@@ -23,7 +23,8 @@ export async function scheduleProcessingHandler(
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }
 
-  await storage.deleteFailures(body)
+  // TODO: failures will be deleted manually, let keep this comment to revise in the future
+  // await storage.deleteFailures(body)
 
   const response = await fetch.fetch(
     `${peerUrl}/content/deployments?` +
