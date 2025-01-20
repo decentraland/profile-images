@@ -1016,10 +1016,10 @@
     "@well-known-components/interfaces" "^1.4.2"
     node-fetch "^2.7.0"
 
-"@dcl/schemas@^15.1.1":
-  version "15.1.1"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-15.1.1.tgz#c82916ea2e1d431cc57dafb29f3c81494c018dbe"
-  integrity sha512-oJL0yqNn//uAjOiZadnXqaV6RLY6fnQZZrW+tZR0DMhW6zMq0wANGBaBNN6W6vpVw+64GYHlTdjxCwevfKsv2A==
+"@dcl/schemas@^15.5.0":
+  version "15.5.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-15.5.0.tgz#4d13a6a3bea8174324dd9030d7afad4949b038e4"
+  integrity sha512-I3q+z4UoztrhdZ7z1CINhtmRt7u7jsye/M50y5LqxfhL87WNpePXuqjuaB37dtlLO19O+88TYeeKcp5aSymRvA==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
