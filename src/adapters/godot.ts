@@ -37,6 +37,7 @@ export async function createGodotSnapshotComponent({
   const peerUrl = await config.requireString('PEER_URL')
   const logger = logs.getLogger('godot-snapshot')
   const explorerPath = process.env.EXPLORER_PATH || '.'
+  const godotEditorPath = `${explorerPath}/decentraland.godot.client.x86_64`
   const baseTime = (await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000
   const timePerAvatar = (await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000
 
@@ -45,13 +46,12 @@ export async function createGodotSnapshotComponent({
   function runGodot(input: GodotInput): Promise<{ error: boolean; stderr: string; stdout: string }> {
     return new Promise(async (resolve) => {
       executionNumber += 1
-
       const timeout = baseTime + input.payload.length * timePerAvatar
       const avatarDataPath = `temp-avatars-${executionNumber}.json`
       await writeFile(avatarDataPath, JSON.stringify(input))
 
       await mkdir(outputPath, { recursive: true })
-      const command = `${explorerPath}/decentraland.godot.client.x86_64 --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
+      const command = `${godotEditorPath} --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
       logger.debug(
         `about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}, timeout: ${timeout}`
       )
@@ -63,6 +63,7 @@ export async function createGodotSnapshotComponent({
           return
         }
 
+        // Clean up the temporary avatar data file.
         rm(avatarDataPath).catch(logger.error)
         if (error) {
           for (const f of globSync('core.*')) {
@@ -72,25 +73,63 @@ export async function createGodotSnapshotComponent({
           return resolve({ error: true, stdout, stderr })
         }
         resolved = true
-        resolve({ error: false, stdout, stderr })
+        resolve({ error: false, stdout: stdout, stderr })
       })
 
       const childProcessPid = childProcess.pid
 
+      // Helper: kill all processes whose command line matches the Godot executable.
+      const killProcessTree = () => {
+        // Adjust the match pattern if needed.
+        const pkillCommand = `pkill -9 -f "${godotEditorPath}"`
+        exec(pkillCommand, (err, _stdout, _stderr) => {
+          if (err) {
+            // pkill returns code 1 if no process was matched; ignore that.
+            if ((err as any).code !== 1) {
+              logger.error('Error executing pkill for godot process tree', {
+                message: (err as Error).message
+              })
+            }
+          }
+        })
+      }
+
+      // Helper: kill the process group and then ensure the entire tree is killed.
+      const killProcessGroup = () => {
+        if (childProcessPid !== undefined) {
+          try {
+            // Attempt to kill the entire process group.
+            process.kill(-childProcessPid, 'SIGKILL')
+          } catch (e: unknown) {
+            if (e instanceof Error && (e as any).code === 'ESRCH') {
+              // Process group already terminated.
+            } else if (e instanceof Error) {
+              logger.error('Error when killing process group', { message: e.message })
+            } else {
+              logger.error('Error when killing process group', { error: String(e) })
+            }
+          }
+        } else {
+          logger.error('childProcess.pid is undefined; cannot kill process group')
+        }
+        // Additionally, call pkill to catch any stray Godot processes.
+        killProcessTree()
+      }
+
       childProcess.on('close', (_code, signal) => {
-        // timeout sends SIGTERM, we might want to kill it harder
+        // If a SIGTERM was received, try to kill the process group.
         if (signal === 'SIGTERM') {
-          childProcess.kill('SIGKILL')
+          killProcessGroup()
         }
       })
 
       setTimeout(() => {
-        exec(`kill -9 ${childProcessPid}`, () => {})
+        killProcessGroup()
         if (!resolved) {
-          resolve({ error: true, stdout: '', stderr: 'timeout' })
           resolved = true
+          resolve({ error: true, stdout: '', stderr: 'timeout' })
         }
-      }, timeout + 5_000)
+      }, timeout + 5000)
     })
   }
 
