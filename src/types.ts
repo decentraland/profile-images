@@ -14,7 +14,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import { IStorageComponent } from './adapters/storage'
 import { AwsConfig } from './adapters/aws-config'
 import { EntityFetcher } from './adapters/entity-fetcher'
-import { ImageProcessor } from './adapters/image-processor'
+import { ImageProcessor } from './logic/image-processor'
 import { MessageValidator } from './logic/message-validator'
 import { QueueComponent } from './logic/queue'
 

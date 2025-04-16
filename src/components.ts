@@ -15,7 +15,7 @@ import { createSQSClient } from './adapters/sqs'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createAwsConfig } from './adapters/aws-config'
 import { createEntityFetcher } from './adapters/entity-fetcher'
-import { createImageProcessor } from './adapters/image-processor'
+import { createImageProcessor } from './logic/image-processor'
 import { createMessageValidator } from './logic/message-validator'
 import { createQueueComponent } from './logic/queue'
 

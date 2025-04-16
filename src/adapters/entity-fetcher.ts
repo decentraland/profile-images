@@ -6,7 +6,7 @@ import { retry } from '../utils/retryer'
 import { shuffleArray } from '../utils/array'
 
 export type EntityFetcher = {
-  getEntitiesByIds: (ids: string[]) => Promise<Entity[]>
+  getEntitiesByIds: (ids: string[], options?: Options) => Promise<Entity[]>
 }
 
 type Options = {
