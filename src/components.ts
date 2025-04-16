@@ -10,11 +10,14 @@ import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createProducerComponent } from './adapters/producer'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createSQSClient } from './adapters/sqs'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createAwsConfig } from './adapters/aws-config'
+import { createEntityFetcher } from './adapters/entity-fetcher'
+import { createImageProcessor } from './adapters/image-processor'
+import { createMessageValidator } from './logic/message-validator'
+import { createQueueComponent } from './logic/queue'
 
 // Initialize all the components of the app
 export async function initComponents(): Promise<AppComponents> {
@@ -43,21 +46,27 @@ export async function initComponents(): Promise<AppComponents> {
 
   const sqsClient = await createSQSClient({ awsConfig })
 
-  const consumer = await createConsumerComponent({
+  const entityFetcher = await createEntityFetcher({ fetch, config })
+
+  const imageProcessor = await createImageProcessor({
     config,
     logs,
     godot,
-    sqsClient,
     storage,
     metrics
   })
 
-  const producer = await createProducerComponent({
+  const messageValidator = createMessageValidator({ logs })
+
+  const queue = await createQueueComponent({ sqsClient })
+
+  const consumer = await createConsumerComponent({
     config,
     logs,
-    sqsClient,
-    storage,
-    fetch
+    entityFetcher,
+    imageProcessor,
+    messageValidator,
+    queue
   })
 
   return {
@@ -65,13 +74,16 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     fetch,
     godot,
-    producer,
     logs,
     metrics,
     sqsClient,
     consumer,
     server,
     storage,
-    statusChecks
+    statusChecks,
+    entityFetcher,
+    imageProcessor,
+    messageValidator,
+    queue
   }
 }
