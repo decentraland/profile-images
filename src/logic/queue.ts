@@ -5,7 +5,7 @@ import {
   ReceiveMessageCommand,
   SendMessageCommand
 } from '@aws-sdk/client-sqs'
-import { ExtendedAvatar } from '../types'
+import { ExtendedAvatar, ReceiveMessageOptions } from '../types'
 import { SqsClient } from '../adapters/sqs'
 
 export async function sqsSendMessage(client: SqsClient, queueUrl: string, message: ExtendedAvatar) {
@@ -19,12 +19,13 @@ export async function sqsSendMessage(client: SqsClient, queueUrl: string, messag
 export async function sqsReceiveMessage(
   client: SqsClient,
   queueUrl: string,
-  options: { maxNumberOfMessages: number; waitTimeSeconds?: number }
+  options: ReceiveMessageOptions
 ): Promise<Message[]> {
   const receiveCommand = new ReceiveMessageCommand({
     QueueUrl: queueUrl,
     MaxNumberOfMessages: options.maxNumberOfMessages,
-    WaitTimeSeconds: options.waitTimeSeconds
+    VisibilityTimeout: options.visibilityTimeout || 60,
+    WaitTimeSeconds: options.waitTimeSeconds || 20
   })
   const { Messages = [] } = await client.receiveMessages(receiveCommand)
 

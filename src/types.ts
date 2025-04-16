@@ -69,6 +69,12 @@ export type ExtendedAvatar = {
   avatar: AvatarInfo
 }
 
+export type ReceiveMessageOptions = {
+  maxNumberOfMessages: number
+  waitTimeSeconds?: number
+  visibilityTimeout?: number
+}
+
 export type AvatarGenerationResult = ExtendedAvatar & {
   success: boolean
   avatarPath: string
