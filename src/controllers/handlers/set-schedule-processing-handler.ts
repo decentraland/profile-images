@@ -8,10 +8,10 @@ export async function scheduleProcessingHandler(
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, queue, storage: _storage, fetch, config }
+    components: { logs, queue: _queue, storage: _storage, fetch, config }
   } = context
 
-  const [mainQueueUrl, peerUrl] = await Promise.all([
+  const [_mainQueueUrl, peerUrl] = await Promise.all([
     config.requireString('QUEUE_NAME'),
     config.requireString('PEER_URL')
   ])
@@ -35,8 +35,12 @@ export async function scheduleProcessingHandler(
 
   for (const entity of data.deployments) {
     const profile: Profile = entity.metadata
+    const avatar = profile.avatars[0].avatar
+    logger.debug(`Processing entity="${entity.entityId}" avatar="${avatar}"`)
+
     // TODO: process image directly without enqueuing the message
-    // await queue.sendMessage(mainQueueUrl, { entity: entity.entityId, avatar: profile.avatars[0].avatar })
+    // await queue.sendMessage(mainQueueUrl, { entity: entity.entityId, avatar })
+
     logger.debug(`Added to queue entity="${entity.entityId}"`)
   }
 

@@ -1,11 +1,10 @@
-import { sqsStatus } from '../../logic/queue'
 import { HandlerContextWithPath, StatusResponse } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function statusHandler(
-  context: HandlerContextWithPath<'config' | 'sqsClient', '/status'>
+  context: HandlerContextWithPath<'config' | 'queue', '/status'>
 ): Promise<IHttpServerComponent.IResponse> {
-  const { config, sqsClient } = context.components
+  const { config, queue } = context.components
 
   const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
     config.requireString('QUEUE_NAME'),
@@ -15,8 +14,8 @@ export async function statusHandler(
   ])
 
   const [queueStatus, retryQueueStatus] = await Promise.all([
-    sqsStatus(sqsClient, mainQueueUrl),
-    sqsStatus(sqsClient, retryQueueUrl)
+    queue.getStatus(mainQueueUrl),
+    queue.getStatus(retryQueueUrl)
   ])
 
   const status: StatusResponse = {
