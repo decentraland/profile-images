@@ -5,54 +5,71 @@ import {
   ReceiveMessageCommand,
   SendMessageCommand
 } from '@aws-sdk/client-sqs'
-import { ExtendedAvatar, ReceiveMessageOptions } from '../types'
-import { SqsClient } from '../adapters/sqs'
+import { ReceiveMessageOptions } from '../types'
+import { CatalystDeploymentEvent } from '@dcl/schemas'
+import { AppComponents } from '../types'
 
-export async function sqsSendMessage(client: SqsClient, queueUrl: string, message: ExtendedAvatar) {
-  const sendCommand = new SendMessageCommand({
-    QueueUrl: queueUrl,
-    MessageBody: JSON.stringify(message)
-  })
-  await client.sendMessage(sendCommand)
+export type QueueComponent = {
+  sendMessage(queueUrl: string, message: CatalystDeploymentEvent): Promise<void>
+  receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]>
+  deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>
+  getStatus(queueUrl: string): Promise<{
+    ApproximateNumberOfMessages: string
+    ApproximateNumberOfMessagesNotVisible: string
+    ApproximateNumberOfMessagesDelayed: string
+  }>
 }
 
-export async function sqsReceiveMessage(
-  client: SqsClient,
-  queueUrl: string,
-  options: ReceiveMessageOptions
-): Promise<Message[]> {
-  const receiveCommand = new ReceiveMessageCommand({
-    QueueUrl: queueUrl,
-    MaxNumberOfMessages: options.maxNumberOfMessages,
-    VisibilityTimeout: options.visibilityTimeout || 60,
-    WaitTimeSeconds: options.waitTimeSeconds || 20
-  })
-  const { Messages = [] } = await client.receiveMessages(receiveCommand)
+export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 'sqsClient'>): Promise<QueueComponent> {
+  async function sendMessage(queueUrl: string, message: CatalystDeploymentEvent) {
+    const sendCommand = new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(message)
+    })
+    await sqsClient.sendMessage(sendCommand)
+  }
 
-  return Messages
-}
+  async function receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]> {
+    const receiveCommand = new ReceiveMessageCommand({
+      QueueUrl: queueUrl,
+      MaxNumberOfMessages: options.maxNumberOfMessages,
+      VisibilityTimeout: options.visibilityTimeout || 60,
+      WaitTimeSeconds: options.waitTimeSeconds || 20
+    })
+    const { Messages = [] } = await sqsClient.receiveMessages(receiveCommand)
 
-export async function sqsDeleteMessage(client: SqsClient, queueUrl: string, receiptHandle: string) {
-  const deleteCommand = new DeleteMessageCommand({
-    QueueUrl: queueUrl,
-    ReceiptHandle: receiptHandle
-  })
-  await client.deleteMessage(deleteCommand)
-}
+    return Messages
+  }
 
-export async function sqsStatus(client: SqsClient, queueUrl: string): Promise<Record<string, any>> {
-  const command = new GetQueueAttributesCommand({
-    QueueUrl: queueUrl,
-    AttributeNames: [
-      'ApproximateNumberOfMessages',
-      'ApproximateNumberOfMessagesNotVisible',
-      'ApproximateNumberOfMessagesDelayed'
-    ]
-  })
-  const response = await client.getQueueAttributes(command)
+  async function deleteMessage(queueUrl: string, receiptHandle: string) {
+    const deleteCommand = new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: receiptHandle
+    })
+    await sqsClient.deleteMessage(deleteCommand)
+  }
+
+  async function getStatus(queueUrl: string) {
+    const command = new GetQueueAttributesCommand({
+      QueueUrl: queueUrl,
+      AttributeNames: [
+        'ApproximateNumberOfMessages',
+        'ApproximateNumberOfMessagesNotVisible',
+        'ApproximateNumberOfMessagesDelayed'
+      ]
+    })
+    const response = await sqsClient.getQueueAttributes(command)
+    return {
+      ApproximateNumberOfMessages: response.Attributes?.ApproximateNumberOfMessages ?? '0',
+      ApproximateNumberOfMessagesNotVisible: response.Attributes?.ApproximateNumberOfMessagesNotVisible ?? '0',
+      ApproximateNumberOfMessagesDelayed: response.Attributes?.ApproximateNumberOfMessagesDelayed ?? '0'
+    }
+  }
+
   return {
-    ApproximateNumberOfMessages: response.Attributes?.ApproximateNumberOfMessages,
-    ApproximateNumberOfMessagesNotVisible: response.Attributes?.ApproximateNumberOfMessagesNotVisible,
-    ApproximateNumberOfMessagesDelayed: response.Attributes?.ApproximateNumberOfMessagesDelayed
+    sendMessage,
+    receiveMessage,
+    deleteMessage,
+    getStatus
   }
 }

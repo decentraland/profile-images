@@ -13,6 +13,10 @@ import { SqsClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
 import { IStorageComponent } from './adapters/storage'
 import { AwsConfig } from './adapters/aws-config'
+import { EntityFetcher } from './adapters/entity-fetcher'
+import { ImageProcessor } from './adapters/image-processor'
+import { MessageValidator } from './logic/message-validator'
+import { QueueComponent } from './logic/queue'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -27,9 +31,13 @@ export type BaseComponents = {
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   sqsClient: SqsClient
+  entityFetcher: EntityFetcher
   consumer: QueueWorker
   server: IHttpServerComponent<GlobalContext>
   storage: IStorageComponent
+  imageProcessor: ImageProcessor
+  messageValidator: MessageValidator
+  queue: QueueComponent
 }
 
 // components used in runtime
@@ -80,6 +88,6 @@ export type AvatarGenerationResult = ExtendedAvatar & {
 }
 
 export type QueueWorker = IBaseComponent & {
-  process: (queueUrl: string, messages: Message[]) => Promise<void>
+  processMessages: (queueUrl: string, messages: Message[]) => Promise<void>
   poll: () => Promise<{ queueUrl: string; messages: Message[] }>
 }
