@@ -1,282 +1,247 @@
-import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createConsumerComponent } from '../../../src/adapters/consumer'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { ExtendedAvatar } from '../../../src/types'
-import { GodotComponent } from '../../../src/adapters/godot'
-import { SqsClient } from '../../../src/adapters/sqs'
-import { ReceiveMessageCommand, Message } from '@aws-sdk/client-sqs'
-import { metricDeclarations } from '../../../src/metrics'
-import { IStorageComponent } from '../../../src/adapters/storage'
+import { Message } from '@aws-sdk/client-sqs'
+import { QueueComponent } from '../../../src/logic/queue'
+import { ILoggerComponent } from '@well-known-components/interfaces'
+import { CatalystDeploymentEvent, Entity, EntityType } from '@dcl/schemas'
+import { MessageValidator } from '../../../src/logic/message-validator'
+import { EntityFetcher } from '../../../src/adapters/entity-fetcher'
+import { ImageProcessor } from '../../../src/logic/image-processor'
 
 const QUEUE_NAME = 'main-queue'
 const RETRY_QUEUE_NAME = 'retry-queue'
 
 describe('Consumer test', function () {
   const config = createConfigComponent({ QUEUE_NAME, RETRY_QUEUE_NAME }, {})
-  const metrics = createTestMetricsComponent(metricDeclarations)
+  let logs: ILoggerComponent
 
-  it('poll', async () => {
-    const logs = await createLogComponent({ config })
-
-    const godot: GodotComponent = {
-      generateImages: jest.fn()
-    }
-
-    const receiveMessages = jest.fn()
-    const sqsClient: SqsClient = {
-      receiveMessages
-    } as any
-    const storage: IStorageComponent = {} as any
-    const consumer = await createConsumerComponent({ metrics, config, logs, godot, sqsClient, storage })
-
-    let queueMessages = [1, 2, 3, 4]
-    let retryQueueMessages = [5, 6]
-    receiveMessages.mockImplementation((payload: ReceiveMessageCommand) => {
-      if (payload.input.QueueUrl === QUEUE_NAME) {
-        const r = { Messages: queueMessages }
-        queueMessages = []
-        return r
-      } else if (payload.input.QueueUrl === RETRY_QUEUE_NAME) {
-        const r = { Messages: retryQueueMessages }
-        retryQueueMessages = []
-        return r
-      }
-    })
-
-    {
-      const { queueUrl, messages } = await consumer.poll()
-      expect(queueUrl).toEqual(QUEUE_NAME)
-      expect(messages).toHaveLength(4)
-    }
-
-    {
-      const { queueUrl, messages } = await consumer.poll()
-      expect(queueUrl).toEqual(RETRY_QUEUE_NAME)
-      expect(messages).toHaveLength(2)
-    }
-
-    {
-      const { messages } = await consumer.poll()
-      expect(messages).toHaveLength(0)
-    }
+  beforeEach(async () => {
+    logs = await createLogComponent({ config })
   })
 
-  it('process: handle invalid messages', async () => {
-    const logs = await createLogComponent({ config })
+  describe('poll', () => {
+    it('should poll main queue first and retry queue if main is empty', async () => {
+      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
 
-    const godot: GodotComponent = {
-      generateImages: jest.fn()
-    }
+      queue.receiveMessage.mockResolvedValueOnce([])
+      queue.receiveMessage.mockResolvedValueOnce([createTestMessage('4'), createTestMessage('5')])
 
-    const deleteMessage = jest.fn()
-    const sqsClient: SqsClient = {
-      deleteMessage
-    } as any
-    const storage: IStorageComponent = {} as any
-    const consumer = await createConsumerComponent({ metrics, config, logs, godot, sqsClient, storage })
+      const consumer = await createConsumerComponent({
+        config,
+        logs,
+        queue,
+        messageValidator,
+        entityFetcher,
+        imageProcessor
+      })
 
-    const messages: Message[] = [
-      {
-        ReceiptHandle: '0'
-      }
-    ]
-    await consumer.process(QUEUE_NAME, messages)
+      const result1 = await consumer.poll()
+      expect(result1.queueUrl).toBe(RETRY_QUEUE_NAME)
+      expect(result1.messages).toHaveLength(2)
 
-    expect(deleteMessage).toHaveBeenCalledTimes(1)
-    const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[0][0].input
-    expect(QueueUrl).toEqual(QUEUE_NAME)
-    expect(ReceiptHandle).toEqual('0')
+      expect(queue.receiveMessage).toHaveBeenCalledTimes(2)
+      expect(queue.receiveMessage).toHaveBeenNthCalledWith(1, QUEUE_NAME, { maxNumberOfMessages: 10 })
+      expect(queue.receiveMessage).toHaveBeenNthCalledWith(2, RETRY_QUEUE_NAME, { maxNumberOfMessages: 1 })
+    })
+
+    it('should throw error when queue.receiveMessage fails', async () => {
+      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
+
+      const expectedError = new Error('Queue error')
+      queue.receiveMessage.mockRejectedValueOnce(expectedError)
+
+      const consumer = await createConsumerComponent({
+        config,
+        logs,
+        queue,
+        messageValidator,
+        entityFetcher,
+        imageProcessor
+      })
+
+      await expect(consumer.poll()).rejects.toThrow(expectedError)
+
+      expect(queue.receiveMessage).toHaveBeenCalledTimes(1)
+      expect(queue.receiveMessage).toHaveBeenCalledWith(QUEUE_NAME, { maxNumberOfMessages: 10 })
+    })
   })
 
-  it('process: call godot with a single entity failure', async () => {
-    const logs = await createLogComponent({ config })
+  describe('processMessages', () => {
+    it('should handle invalid messages and delete them immediately', async () => {
+      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
+      const messages = [createTestMessage('1'), createTestMessage('2')]
 
-    const generateImages = jest.fn()
+      messageValidator.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: messages.map((msg) => ({ message: msg, error: 'invalid_json' }))
+      })
 
-    const deleteMessage = jest.fn()
-    const sendMessage = jest.fn()
-    const sqsClient: SqsClient = {
-      deleteMessage,
-      sendMessage
-    } as any
+      const consumer = await createConsumerComponent({
+        config,
+        logs,
+        queue,
+        messageValidator,
+        entityFetcher,
+        imageProcessor
+      })
 
-    const storeFailure = jest.fn()
-    const storage: IStorageComponent = {
-      storeFailure
-    } as any
+      await consumer.processMessages(QUEUE_NAME, messages)
 
-    const consumer = await createConsumerComponent({
-      metrics,
-      config,
-      logs,
-      godot: { generateImages },
-      sqsClient,
-      storage
+      expect(messageValidator.validateMessages).toHaveBeenCalledTimes(1)
+      expect(queue.deleteMessage).toHaveBeenCalledTimes(2)
+      expect(entityFetcher.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(imageProcessor.processEntities).not.toHaveBeenCalled()
     })
 
-    const messages: Message[] = [
-      {
-        ReceiptHandle: '0',
-        Body: JSON.stringify({ entity: '0', avatar: {} })
-      }
-    ]
+    it('should process valid messages successfully', async () => {
+      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
+      const entity1 = createTestEntity('1')
+      const entity2 = createTestEntity('2')
 
-    generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return {
-        avatars: input.map(({ avatar, entity }: ExtendedAvatar) => ({
-          avatar,
-          entity,
-          success: false,
-          avatarPath: 'avatar0.png',
-          facePath: 'face0.png'
-        }))
-      }
+      const event1 = { entity: { id: '1', type: EntityType.PROFILE }, avatar: entity1.metadata.avatars[0].avatar }
+      const event2 = { entity: { id: '2', type: EntityType.PROFILE }, avatar: entity2.metadata.avatars[0].avatar }
+
+      const messages = [createTestMessage('1', event1), createTestMessage('2', event2)]
+
+      messageValidator.validateMessages.mockReturnValueOnce({
+        validMessages: messages.map((msg) => ({
+          message: msg,
+          event: JSON.parse(msg.Body!) as CatalystDeploymentEvent
+        })),
+        invalidMessages: []
+      })
+
+      entityFetcher.getEntitiesByIds.mockResolvedValueOnce([entity1, entity2])
+
+      imageProcessor.processEntities.mockResolvedValueOnce([
+        { entity: '1', success: true, shouldRetry: false, avatar: entity1.metadata.avatars[0].avatar },
+        { entity: '2', success: true, shouldRetry: false, avatar: entity2.metadata.avatars[0].avatar }
+      ])
+
+      const consumer = await createConsumerComponent({
+        config,
+        logs,
+        queue,
+        messageValidator,
+        entityFetcher,
+        imageProcessor
+      })
+
+      await consumer.processMessages(QUEUE_NAME, messages)
+
+      expect(messageValidator.validateMessages).toHaveBeenCalledWith(messages)
+      expect(entityFetcher.getEntitiesByIds).toHaveBeenCalledWith(['1', '2'])
+      expect(imageProcessor.processEntities).toHaveBeenCalledWith([entity1, entity2])
+      expect(queue.deleteMessage).toHaveBeenCalledTimes(2)
+      expect(queue.deleteMessage).toHaveBeenNthCalledWith(1, QUEUE_NAME, 'receipt-1')
+      expect(queue.deleteMessage).toHaveBeenNthCalledWith(2, QUEUE_NAME, 'receipt-2')
     })
 
-    await consumer.process(QUEUE_NAME, messages)
+    it('should handle processing failures with retry', async () => {
+      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
+      const entity1 = createTestEntity('1')
+      const entity2 = createTestEntity('2')
 
-    expect(deleteMessage).toHaveBeenCalledTimes(1)
-    {
-      const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[0][0].input
-      expect(QueueUrl).toEqual(QUEUE_NAME)
-      expect(ReceiptHandle).toEqual('0')
-    }
+      const event1 = { entity: { id: '1', type: EntityType.PROFILE }, avatar: entity1.metadata.avatars[0].avatar }
+      const event2 = { entity: { id: '2', type: EntityType.PROFILE }, avatar: entity2.metadata.avatars[0].avatar }
 
-    expect(storeFailure).toHaveBeenCalledTimes(1)
-    expect(storeFailure.mock.calls[0][0]).toEqual('0')
+      const messages = [createTestMessage('1', event1), createTestMessage('2', event2)]
+
+      messageValidator.validateMessages.mockReturnValueOnce({
+        validMessages: messages.map((msg) => ({
+          message: msg,
+          event: JSON.parse(msg.Body!) as CatalystDeploymentEvent
+        })),
+        invalidMessages: []
+      })
+
+      entityFetcher.getEntitiesByIds.mockResolvedValueOnce([entity1, entity2])
+
+      imageProcessor.processEntities.mockResolvedValueOnce([
+        { entity: '1', success: false, shouldRetry: true, avatar: entity1.metadata.avatars[0].avatar },
+        { entity: '2', success: false, shouldRetry: true, avatar: entity2.metadata.avatars[0].avatar }
+      ])
+
+      const consumer = await createConsumerComponent({
+        config,
+        logs,
+        queue,
+        messageValidator,
+        entityFetcher,
+        imageProcessor
+      })
+
+      await consumer.processMessages(QUEUE_NAME, messages)
+
+      expect(messageValidator.validateMessages).toHaveBeenCalledWith(messages)
+      expect(entityFetcher.getEntitiesByIds).toHaveBeenCalledWith(['1', '2'])
+      expect(imageProcessor.processEntities).toHaveBeenCalledWith([entity1, entity2])
+      expect(queue.deleteMessage).toHaveBeenCalledTimes(2)
+      expect(queue.sendMessage).toHaveBeenCalledTimes(2)
+      expect(queue.sendMessage).toHaveBeenNthCalledWith(1, RETRY_QUEUE_NAME, event1)
+      expect(queue.sendMessage).toHaveBeenNthCalledWith(2, RETRY_QUEUE_NAME, event2)
+    })
   })
 
-  it('process: call godot with multiple entity failure should requeue the messages individually', async () => {
-    const logs = await createLogComponent({ config })
-
-    const generateImages = jest.fn()
-
-    const deleteMessage = jest.fn()
-    const sendMessage = jest.fn()
-    const sqsClient: SqsClient = {
-      deleteMessage,
-      sendMessage
-    } as any
-
-    const storage: IStorageComponent = {} as any
-
-    const consumer = await createConsumerComponent({
-      metrics,
-      config,
-      logs,
-      godot: { generateImages },
-      sqsClient,
-      storage
-    })
-
-    const messages: Message[] = [
-      {
-        ReceiptHandle: '0',
-        Body: JSON.stringify({ entity: '0', avatar: {} })
-      },
-      {
-        ReceiptHandle: '1',
-        Body: JSON.stringify({ entity: '1', avatar: {} })
-      }
-    ]
-
-    generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return {
-        avatars: input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
-          avatar,
-          entity,
-          success: false,
-          avatarPath: `avatar${i}.png`,
-          facePath: `face${i}.png`
-        }))
-      }
-    })
-
-    await consumer.process(QUEUE_NAME, messages)
-
-    expect(deleteMessage).toHaveBeenCalledTimes(2)
-    {
-      const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[0][0].input
-      expect(QueueUrl).toEqual(QUEUE_NAME)
-      expect(ReceiptHandle).toEqual('0')
-    }
-    {
-      const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[1][0].input
-      expect(QueueUrl).toEqual(QUEUE_NAME)
-      expect(ReceiptHandle).toEqual('1')
-    }
-
-    expect(sendMessage).toHaveBeenCalledTimes(2)
-    {
-      const { QueueUrl } = sendMessage.mock.calls[0][0].input
-      expect(QueueUrl).toEqual(RETRY_QUEUE_NAME)
-    }
-    {
-      const { QueueUrl } = sendMessage.mock.calls[0][0].input
-      expect(QueueUrl).toEqual(RETRY_QUEUE_NAME)
-    }
+  // Helpers
+  const createTestMessage = (id: string, body?: any): Message => ({
+    MessageId: id,
+    ReceiptHandle: `receipt-${id}`,
+    Body: body ? JSON.stringify(body) : undefined,
+    MD5OfBody: 'test-md5',
+    Attributes: {}
   })
 
-  it('process: call godot with successful results', async () => {
-    const logs = await createLogComponent({ config })
-
-    const generateImages = jest.fn()
-
-    const deleteMessage = jest.fn()
-    const sqsClient: SqsClient = {
-      deleteMessage
-    } as any
-
-    const storeImages = jest.fn().mockResolvedValue(true)
-    const storage: IStorageComponent = {
-      storeImages
-    } as any
-
-    const consumer = await createConsumerComponent({
-      metrics,
-      config,
-      logs,
-      godot: { generateImages },
-      sqsClient,
-      storage
-    })
-
-    const messages: Message[] = [
-      {
-        ReceiptHandle: '0',
-        Body: JSON.stringify({ entity: '0', avatar: {} })
-      },
-      {
-        ReceiptHandle: '1',
-        Body: JSON.stringify({ entity: '1', avatar: {} })
-      }
-    ]
-
-    generateImages.mockImplementation((input: ExtendedAvatar[]) => {
-      return {
-        avatars: input.map(({ avatar, entity }: ExtendedAvatar, i) => ({
-          avatar,
-          entity,
-          success: true,
-          avatarPath: `avatar${i}.png`,
-          facePath: `face${i}.png`
-        }))
-      }
-    })
-
-    await consumer.process(QUEUE_NAME, messages)
-
-    expect(deleteMessage).toHaveBeenCalledTimes(2)
-    {
-      const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[0][0].input
-      expect(QueueUrl).toEqual(QUEUE_NAME)
-      expect(ReceiptHandle).toEqual('0')
-    }
-    {
-      const { QueueUrl, ReceiptHandle } = deleteMessage.mock.calls[1][0].input
-      expect(QueueUrl).toEqual(QUEUE_NAME)
-      expect(ReceiptHandle).toEqual('1')
-    }
+  const createTestEntity = (id: string): Entity => ({
+    id,
+    type: EntityType.PROFILE,
+    metadata: {
+      avatars: [
+        {
+          avatar: {
+            bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+            eyes: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+            hair: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+            skin: { color: { r: 0.23, g: 0.24, b: 0.25 } }
+          }
+        }
+      ]
+    },
+    version: 'v3',
+    pointers: [`0x${id}`],
+    timestamp: 1234567890,
+    content: []
   })
+
+  const createMockComponents = () => {
+    const queue: jest.Mocked<QueueComponent> = {
+      receiveMessage: jest.fn(),
+      sendMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      getStatus: jest.fn().mockReturnValue({ isProcessing: false })
+    }
+
+    const messageValidator: jest.Mocked<MessageValidator> = {
+      validateMessages: jest.fn().mockReturnValue({
+        validMessages: [],
+        invalidMessages: []
+      })
+    }
+
+    const entityFetcher: jest.Mocked<EntityFetcher> = {
+      getEntitiesByIds: jest.fn()
+    }
+
+    const imageProcessor: jest.Mocked<ImageProcessor> = {
+      processEntities: jest.fn()
+    }
+
+    return {
+      queue,
+      messageValidator,
+      entityFetcher,
+      imageProcessor
+    }
+  }
 })

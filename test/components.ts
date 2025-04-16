@@ -61,7 +61,7 @@ async function initComponents(): Promise<TestComponents> {
 
   const consumer: QueueWorker = {
     poll: jest.fn(),
-    process: jest.fn()
+    processMessages: jest.fn()
   }
 
   return {
