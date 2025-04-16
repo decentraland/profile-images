@@ -8,7 +8,6 @@ import { QueueWorker, TestComponents } from '../src/types'
 import { initComponents as originalInitComponents } from '../src/components'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../src/metrics'
-import { Producer } from '../src/adapters/producer'
 import { IStorageComponent } from '../src/adapters/storage'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { SqsClient } from '../src/adapters/sqs'
@@ -65,18 +64,12 @@ async function initComponents(): Promise<TestComponents> {
     process: jest.fn()
   }
 
-  const producer: Producer = {
-    changeLastRun: jest.fn(),
-    poll: jest.fn()
-  }
-
   return {
     ...components,
     localFetch: await createLocalFetchCompoment(config),
     consumer,
     fetch,
     metrics,
-    producer,
     sqsClient,
     storage
   }

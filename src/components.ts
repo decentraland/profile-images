@@ -10,7 +10,6 @@ import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
-import { createProducerComponent } from './adapters/producer'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createSQSClient } from './adapters/sqs'
 import { createFetchComponent } from '@well-known-components/fetch-component'
@@ -49,14 +48,7 @@ export async function initComponents(): Promise<AppComponents> {
     godot,
     sqsClient,
     storage,
-    metrics
-  })
-
-  const producer = await createProducerComponent({
-    config,
-    logs,
-    sqsClient,
-    storage,
+    metrics,
     fetch
   })
 
@@ -65,7 +57,6 @@ export async function initComponents(): Promise<AppComponents> {
     config,
     fetch,
     godot,
-    producer,
     logs,
     metrics,
     sqsClient,

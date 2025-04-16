@@ -1,7 +1,8 @@
 import { Message } from '@aws-sdk/client-sqs'
+import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
-import { sleep } from '../logic/sleep'
 import { sqsDeleteMessage, sqsReceiveMessage, sqsSendMessage } from '../logic/queue'
+import { CatalystDeploymentEvent, Entity, EntityType } from '@dcl/schemas'
 
 export async function createConsumerComponent({
   config,
@@ -9,15 +10,30 @@ export async function createConsumerComponent({
   godot,
   sqsClient,
   storage,
-  metrics
-}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'storage' | 'sqsClient' | 'metrics'>): Promise<QueueWorker> {
+  metrics,
+  fetch
+}: Pick<
+  AppComponents,
+  'config' | 'logs' | 'godot' | 'storage' | 'sqsClient' | 'metrics' | 'fetch'
+>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
-  const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
-    config.requireString('QUEUE_NAME'),
-    config.requireString('RETRY_QUEUE_NAME'),
+  let isRunning = false
+  let processLoopPromise: Promise<void> | null = null
+
+  const [mainQueueUrl, retryQueueUrl, commitHash, version, peerUrl] = await Promise.all([
+    config.requireString('QUEUE_NAME'), // TODO: rename to QUEUE_URL
+    config.requireString('RETRY_QUEUE_NAME'), // TODO: rename to RETRY_QUEUE_URL
     config.getString('COMMIT_HASH'),
-    config.getString('CURRENT_VERSION')
+    config.getString('CURRENT_VERSION'),
+    config.requireString('PEER_URL')
   ])
+
+  async function processLoop() {
+    while (isRunning) {
+      const { queueUrl, messages } = await poll()
+      await process(queueUrl, messages)
+    }
+  }
 
   async function poll() {
     let queueUrl = mainQueueUrl
@@ -35,7 +51,7 @@ export async function createConsumerComponent({
 
     const messageByEntity = new Map<string, Message>()
 
-    const input: ExtendedAvatar[] = []
+    const events: CatalystDeploymentEvent[] = []
     for (const message of messages) {
       if (!message.Body) {
         logger.warn(
@@ -44,8 +60,9 @@ export async function createConsumerComponent({
         await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
         return
       }
-      const body: ExtendedAvatar = JSON.parse(message.Body)
-      if (!body.avatar) {
+
+      const event: CatalystDeploymentEvent = JSON.parse(message.Body)
+      if (!event.entity || event.entity.type !== EntityType.PROFILE) {
         logger.warn(
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
         )
@@ -53,19 +70,34 @@ export async function createConsumerComponent({
         return
       }
 
-      if (messageByEntity.has(body.entity)) {
+      if (messageByEntity.has(event.entity.id)) {
         // NOTE: we are already processing this entity in the batch
+        logger.warn(
+          `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with duplicate entity: ${event.entity.id}`
+        )
         await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
         continue
       }
 
-      messageByEntity.set(body.entity, message)
+      messageByEntity.set(event.entity.id, message)
 
-      input.push(body)
+      events.push(event)
     }
 
-    logger.debug(`Processing: ${input[0].entity} entity`)
-    const { avatars: results, output: outputGenerated } = await godot.generateImages(input)
+    const response = await fetch.fetch(`${peerUrl}/content/entities/active`, {
+      method: 'POST',
+      body: JSON.stringify({ ids: events.map((event) => event.entity.id) })
+    })
+
+    const activeEntities: Entity[] = await response.json()
+    const avatars: ExtendedAvatar[] = activeEntities.map(({ id, metadata }) => ({
+      entity: id,
+      avatar: metadata.avatars[0].avatar
+    }))
+
+    logger.debug(`Got ${activeEntities.length} active entities`)
+
+    const { avatars: results, output: outputGenerated } = await godot.generateImages(avatars)
 
     for (const result of results) {
       const message = messageByEntity.get(result.entity)!
@@ -98,16 +130,24 @@ export async function createConsumerComponent({
 
   async function start() {
     logger.debug('Starting consumer')
-    while (true) {
-      const { queueUrl, messages } = await poll()
+    isRunning = true
 
-      if (messages.length === 0) {
-        await sleep(20 * 1000)
-        continue
-      }
-      await process(queueUrl, messages)
+    // Start the processing loop in the background
+    processLoopPromise = processLoop()
+
+    // Return immediately to not block other components
+    return Promise.resolve()
+  }
+
+  async function stop() {
+    logger.debug('Stopping consumer')
+    isRunning = false
+
+    if (processLoopPromise) {
+      await processLoopPromise
+      processLoopPromise = null
     }
   }
 
-  return { start, process, poll }
+  return { [START_COMPONENT]: start, [STOP_COMPONENT]: stop, process, poll }
 }

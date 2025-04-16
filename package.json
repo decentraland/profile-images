@@ -9,7 +9,6 @@
     "lint:check": "eslint '**/*.{js,ts}'",
     "lint:fix": "eslint '**/*.{js,ts}' --fix",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
-    "start:producer": "ts-node ./src/producer --project tsconfig.json",
     "test": "jest --forceExit --detectOpenHandles --verbose",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage --verbose"
   },

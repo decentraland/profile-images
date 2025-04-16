@@ -11,7 +11,6 @@ import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
 import { SqsClient } from './adapters/sqs'
 import { Message } from '@aws-sdk/client-sqs'
-import { Producer } from './adapters/producer'
 import { IStorageComponent } from './adapters/storage'
 import { AwsConfig } from './adapters/aws-config'
 
@@ -25,7 +24,6 @@ export type BaseComponents = {
   config: IConfigComponent
   fetch: IFetchComponent
   godot: GodotComponent
-  producer: Producer
   logs: ILoggerComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   sqsClient: SqsClient
