@@ -10,7 +10,7 @@ import { metricDeclarations } from './metrics'
 import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'
 import { SqsClient } from './adapters/sqs'
-import { Message } from '@aws-sdk/client-sqs'
+import { Message, MessageSystemAttributeName } from '@aws-sdk/client-sqs'
 import { IStorageComponent } from './adapters/storage'
 import { AwsConfig } from './adapters/aws-config'
 import { EntityFetcher } from './adapters/entity-fetcher'
@@ -79,6 +79,7 @@ export type ReceiveMessageOptions = {
   maxNumberOfMessages: number
   waitTimeSeconds?: number
   visibilityTimeout?: number
+  messageSystemAttributeNames?: MessageSystemAttributeName[]
 }
 
 export type AvatarGenerationResult = ExtendedAvatar & {

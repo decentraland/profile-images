@@ -30,11 +30,14 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
   }
 
   async function receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]> {
+    const { maxNumberOfMessages, visibilityTimeout, waitTimeSeconds, messageSystemAttributeNames } = options
+
     const receiveCommand = new ReceiveMessageCommand({
       QueueUrl: queueUrl,
-      MaxNumberOfMessages: options.maxNumberOfMessages,
-      VisibilityTimeout: options.visibilityTimeout || 60,
-      WaitTimeSeconds: options.waitTimeSeconds || 20
+      MaxNumberOfMessages: maxNumberOfMessages,
+      VisibilityTimeout: visibilityTimeout || 60,
+      WaitTimeSeconds: waitTimeSeconds || 20,
+      MessageSystemAttributeNames: messageSystemAttributeNames
     })
     const { Messages = [] } = await sqsClient.receiveMessages(receiveCommand)
 

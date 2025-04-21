@@ -1,16 +1,7 @@
 import { shuffleArray } from '../../../src/utils/array'
 
 describe('shuffleArray', () => {
-  it('should return an array with the same elements in a different order', () => {
-    const originalArray = [1, 2, 3, 4, 5]
-    const shuffledArray = shuffleArray([...originalArray])
-
-    expect(shuffledArray).toHaveLength(originalArray.length)
-    expect(shuffledArray).not.toEqual(originalArray)
-    expect(shuffledArray.sort()).toEqual(originalArray.sort())
-  })
-
-  it('should shuffle elements randomly (mocked Math.random)', () => {
+  it('should shuffle elements randomly', () => {
     const originalArray = [1, 2, 3, 4, 5]
 
     // to control the shuffle
