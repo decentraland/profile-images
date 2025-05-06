@@ -20,8 +20,8 @@ export async function createImageProcessor({
 }: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'storage' | 'metrics'>): Promise<ImageProcessor> {
   const logger = logs.getLogger('image-processor')
   const [commitHash, version] = await Promise.all([
-    config.getString('COMMIT_HASH'),
-    config.getString('CURRENT_VERSION')
+    config.requireString('COMMIT_HASH'),
+    config.requireString('CURRENT_VERSION')
   ])
 
   async function processEntities(entities: Entity[]): Promise<ProcessingResult[]> {
