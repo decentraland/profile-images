@@ -26,12 +26,7 @@ export async function createEntityFetcher({
   const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
 
   function getContentClientOrDefault(contentServerUrl?: string): ContentClient {
-    return contentServerUrl
-      ? createContentClient({ fetcher: fetch, url: contentServerUrl })
-      : createContentClient({
-          fetcher: fetch,
-          url: peerUrl
-        })
+    return createContentClient({ fetcher: fetch, url: contentServerUrl ?? peerUrl })
   }
 
   function rotateContentServerClient<T>(
