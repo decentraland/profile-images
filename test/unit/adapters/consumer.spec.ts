@@ -8,69 +8,80 @@ import { Entity, EntityType } from '@dcl/schemas'
 import { MessageValidator } from '../../../src/logic/message-validator'
 import { EntityFetcher } from '../../../src/adapters/entity-fetcher'
 import { ImageProcessor } from '../../../src/logic/image-processor'
+import { QueueWorker } from '../../../src/types'
 
 const QUEUE_URL = 'main-queue-url'
 const DLQ_URL = 'dlq-url'
 
 describe('Consumer test', function () {
   const config = createConfigComponent({ QUEUE_URL, DLQ_URL }, {})
+
   let logs: ILoggerComponent
+  let mainQueueMock: jest.Mocked<QueueComponent>
+  let dlQueueMock: jest.Mocked<QueueComponent>
+  let messageValidatorMock: jest.Mocked<MessageValidator>
+  let entityFetcherMock: jest.Mocked<EntityFetcher>
+  let imageProcessorMock: jest.Mocked<ImageProcessor>
+
+  let consumer: QueueWorker
 
   beforeEach(async () => {
+    const components = createMockComponents()
+
+    mainQueueMock = components.mainQueue
+    dlQueueMock = components.dlQueue
+    messageValidatorMock = components.messageValidator
+    entityFetcherMock = components.entityFetcher
+    imageProcessorMock = components.imageProcessor
+
     logs = await createLogComponent({ config })
+
+    consumer = createConsumerComponent({
+      logs,
+      mainQueue: mainQueueMock,
+      dlQueue: dlQueueMock,
+      messageValidator: messageValidatorMock,
+      entityFetcher: entityFetcherMock,
+      imageProcessor: imageProcessorMock
+    })
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
   })
 
   describe('poll', () => {
     it('should poll main queue first and return messages if available', async () => {
-      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const mainQueueMessages = [createTestMessage('1'), createTestMessage('2')]
 
-      queue.receiveMessage.mockResolvedValueOnce(mainQueueMessages)
-
-      const consumer = await createConsumerComponent({
-        config,
-        logs,
-        queue,
-        messageValidator,
-        entityFetcher,
-        imageProcessor
-      })
+      mainQueueMock.receiveMessage.mockResolvedValueOnce(mainQueueMessages)
 
       const result = await consumer.poll()
-      expect(result.queueUrl).toBe(QUEUE_URL)
+      expect(result.queue).toBe(mainQueueMock)
       expect(result.messages).toBe(mainQueueMessages)
-      expect(queue.receiveMessage).toHaveBeenCalledTimes(1)
-      expect(queue.receiveMessage).toHaveBeenCalledWith(QUEUE_URL, {
+      expect(mainQueueMock.receiveMessage).toHaveBeenCalledTimes(1)
+      expect(mainQueueMock.receiveMessage).toHaveBeenCalledWith({
         maxNumberOfMessages: 10,
         messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
       })
     })
 
     it('should poll DLQ if main queue is empty', async () => {
-      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const dlqMessages = [createTestMessage('3')]
 
-      queue.receiveMessage.mockResolvedValueOnce([]) // Main queue empty
-      queue.receiveMessage.mockResolvedValueOnce(dlqMessages)
-
-      const consumer = await createConsumerComponent({
-        config,
-        logs,
-        queue,
-        messageValidator,
-        entityFetcher,
-        imageProcessor
-      })
+      mainQueueMock.receiveMessage.mockResolvedValueOnce([]) // Main queue empty
+      dlQueueMock.receiveMessage.mockResolvedValueOnce(dlqMessages)
 
       const result = await consumer.poll()
-      expect(result.queueUrl).toBe(DLQ_URL)
+
+      expect(result.queue).toBe(dlQueueMock)
       expect(result.messages).toBe(dlqMessages)
-      expect(queue.receiveMessage).toHaveBeenCalledTimes(2)
-      expect(queue.receiveMessage).toHaveBeenNthCalledWith(1, QUEUE_URL, {
+      expect(dlQueueMock.receiveMessage).toHaveBeenCalledTimes(2)
+      expect(dlQueueMock.receiveMessage).toHaveBeenNthCalledWith(1, {
         maxNumberOfMessages: 10,
         messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
       })
-      expect(queue.receiveMessage).toHaveBeenNthCalledWith(2, DLQ_URL, {
+      expect(dlQueueMock.receiveMessage).toHaveBeenNthCalledWith(2, {
         maxNumberOfMessages: 1,
         messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
       })
@@ -79,166 +90,96 @@ describe('Consumer test', function () {
 
   describe('processMessages', () => {
     it('should handle invalid messages by deleting them', async () => {
-      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const messages = [createTestMessage('1'), createTestMessage('2')]
       const invalidReceiptHandles = messages.map((msg) => msg.ReceiptHandle!)
 
-      messageValidator.validateMessages.mockReturnValueOnce({
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [],
         invalidMessages: messages.map((msg) => ({ message: msg, error: 'invalid_json' }))
       })
 
-      const consumer = await createConsumerComponent({
-        config,
-        logs,
-        queue,
-        messageValidator,
-        entityFetcher,
-        imageProcessor
-      })
+      await consumer.processMessages(mainQueueMock, messages)
 
-      await consumer.processMessages(QUEUE_URL, messages)
-
-      expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, invalidReceiptHandles)
-      expect(entityFetcher.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith(invalidReceiptHandles)
+      expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
     })
 
     describe('Main Queue Processing', () => {
       it('should delete message on success', async () => {
-        const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupSuccessfulProcessing(messageValidator, entityFetcher, imageProcessor, message, entity)
+        setupSuccessfulProcessing(messageValidatorMock, entityFetcherMock, imageProcessorMock, message, entity)
 
-        const consumer = await createConsumerComponent({
-          config,
-          logs,
-          queue,
-          messageValidator,
-          entityFetcher,
-          imageProcessor
-        })
+        await consumer.processMessages(mainQueueMock, [message])
 
-        await consumer.processMessages(QUEUE_URL, [message])
-
-        expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, [message.ReceiptHandle])
+        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
       })
 
       it('should not delete message on failure when shouldRetry is true', async () => {
-        const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupFailedProcessing(messageValidator, entityFetcher, imageProcessor, message, entity, true)
+        setupFailedProcessing(messageValidatorMock, entityFetcherMock, imageProcessorMock, message, entity, true)
 
-        const consumer = await createConsumerComponent({
-          config,
-          logs,
-          queue,
-          messageValidator,
-          entityFetcher,
-          imageProcessor
-        })
+        await consumer.processMessages(mainQueueMock, [message])
 
-        await consumer.processMessages(QUEUE_URL, [message])
-
-        expect(queue.deleteMessages).not.toHaveBeenCalled()
-        expect(queue.deleteMessage).not.toHaveBeenCalled()
+        expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        expect(mainQueueMock.deleteMessage).not.toHaveBeenCalled()
       })
 
       it('should delete message on failure when shouldRetry is false', async () => {
-        const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupFailedProcessing(messageValidator, entityFetcher, imageProcessor, message, entity, false)
+        setupFailedProcessing(messageValidatorMock, entityFetcherMock, imageProcessorMock, message, entity, false)
 
-        const consumer = await createConsumerComponent({
-          config,
-          logs,
-          queue,
-          messageValidator,
-          entityFetcher,
-          imageProcessor
-        })
+        await consumer.processMessages(mainQueueMock, [message])
 
-        await consumer.processMessages(QUEUE_URL, [message])
-
-        expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, [message.ReceiptHandle])
+        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
       })
     })
 
     describe('DLQ Processing', () => {
       it('should delete message on success', async () => {
-        const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupSuccessfulProcessing(messageValidator, entityFetcher, imageProcessor, message, entity)
+        setupSuccessfulProcessing(messageValidatorMock, entityFetcherMock, imageProcessorMock, message, entity)
 
-        const consumer = await createConsumerComponent({
-          config,
-          logs,
-          queue,
-          messageValidator,
-          entityFetcher,
-          imageProcessor
-        })
+        await consumer.processMessages(dlQueueMock, [message])
 
-        await consumer.processMessages(DLQ_URL, [message])
-
-        expect(queue.deleteMessages).toHaveBeenCalledWith(DLQ_URL, [message.ReceiptHandle])
+        expect(dlQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
       })
 
       it('should not delete message on failure (let visibility timeout expire)', async () => {
-        const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupFailedProcessing(messageValidator, entityFetcher, imageProcessor, message, entity, true) // shouldRetry is true for DLQ failures generally
+        setupFailedProcessing(messageValidatorMock, entityFetcherMock, imageProcessorMock, message, entity, true) // shouldRetry is true for DLQ failures generally
 
-        const consumer = await createConsumerComponent({
-          config,
-          logs,
-          queue,
-          messageValidator,
-          entityFetcher,
-          imageProcessor
-        })
+        await consumer.processMessages(dlQueueMock, [message])
 
-        await consumer.processMessages(DLQ_URL, [message])
-
-        expect(queue.deleteMessages).not.toHaveBeenCalled()
-        expect(queue.deleteMessage).not.toHaveBeenCalled() // Ensure individual delete is also not called
+        expect(dlQueueMock.deleteMessages).not.toHaveBeenCalled()
+        expect(dlQueueMock.deleteMessage).not.toHaveBeenCalled() // Ensure individual delete is also not called
       })
     })
 
     it('should handle message validation errors gracefully', async () => {
-      const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const message = createTestMessage('1')
 
       // Mock validation to return empty results (as if all failed validation before this step)
-      messageValidator.validateMessages.mockReturnValueOnce({
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [],
         invalidMessages: [] // Assuming no messages even get to the deletion stage if validation itself errors
       })
 
-      const consumer = await createConsumerComponent({
-        config,
-        logs,
-        queue,
-        messageValidator,
-        entityFetcher,
-        imageProcessor
-      })
-
-      await consumer.processMessages(QUEUE_URL, [message])
+      await consumer.processMessages(mainQueueMock, [message])
 
       // On validation error (or no valid/invalid messages returned), processing should not continue to delete
-      expect(entityFetcher.getEntitiesByIds).not.toHaveBeenCalled()
-      expect(queue.deleteMessages).not.toHaveBeenCalled()
-      expect(queue.deleteMessage).not.toHaveBeenCalled()
+      expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+      expect(mainQueueMock.deleteMessage).not.toHaveBeenCalled()
     })
   })
 
@@ -338,7 +279,8 @@ describe('Consumer test', function () {
     }
 
     return {
-      queue,
+      mainQueue: queue,
+      dlQueue: queue,
       messageValidator,
       entityFetcher,
       imageProcessor

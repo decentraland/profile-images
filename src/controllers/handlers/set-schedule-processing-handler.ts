@@ -4,11 +4,11 @@ import { HandlerContextWithPath } from '../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'logs' | 'queue' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'mainQueue' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, queue: _queue, storage: _storage, fetch, config }
+    components: { logs, mainQueue: _queue, storage: _storage, fetch, config }
   } = context
 
   const [_mainQueueUrl, peerUrl] = await Promise.all([

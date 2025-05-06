@@ -3,64 +3,61 @@ import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfac
 import { AppComponents, QueueWorker } from '../types'
 import { ProcessingResult } from '../logic/image-processor'
 import { getReceiveCount } from '../utils/sqs'
+import { QueueComponent } from '../logic/queue'
 
 export const MESSAGE_SYSTEM_ATTRIBUTE_NAMES: MessageSystemAttributeName[] = ['ApproximateReceiveCount', 'SentTimestamp']
 
-export async function createConsumerComponent({
-  config,
+export function createConsumerComponent({
   logs,
   entityFetcher,
   imageProcessor,
   messageValidator,
-  queue
+  mainQueue,
+  dlQueue
 }: Pick<
   AppComponents,
-  'config' | 'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'queue'
->): Promise<QueueWorker> {
+  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue'
+>): QueueWorker {
   const logger = logs.getLogger('consumer')
+  const isDLQ = (queue: QueueComponent) => queue === dlQueue
+
   let isRunning = false
   let processLoopPromise: Promise<void> | null = null
 
-  const [mainQueueUrl, dlqUrl] = await Promise.all([config.requireString('QUEUE_URL'), config.requireString('DLQ_URL')])
-
-  const isDLQ = (queueUrl: string) => queueUrl === dlqUrl
-
   async function processLoop() {
     while (isRunning) {
-      const { queueUrl, messages } = await poll()
-      await processMessages(queueUrl, messages)
+      const { queue, messages } = await poll()
+      await processMessages(queue, messages)
     }
   }
 
   async function poll() {
-    let queueUrl = mainQueueUrl
-    let messages = await queue.receiveMessage(queueUrl, {
+    let queue = mainQueue
+    let messages = await mainQueue.receiveMessage({
       maxNumberOfMessages: 10,
       messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
     })
+
     if (messages.length === 0) {
-      queueUrl = dlqUrl
-      messages = await queue.receiveMessage(queueUrl, {
+      queue = dlQueue
+      messages = await dlQueue.receiveMessage({
         maxNumberOfMessages: 1,
         messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
       })
     }
 
-    return { queueUrl, messages }
+    return { queue, messages }
   }
 
-  async function processMessages(queueUrl: string, messages: Message[]) {
-    const queueName = isDLQ(queueUrl) ? 'dlq' : 'main'
-    logger.debug(`Processing: ${messages.length} profiles from ${queueName} queue`)
+  async function processMessages(queue: QueueComponent, messages: Message[]) {
+    const queueName = isDLQ(queue) ? 'dlq' : 'main'
+    logger.debug(`Processing: ${messages.length} profiles from queue`)
 
     const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
 
     if (invalidMessages.length > 0) {
       logger.warn(`Deleting ${invalidMessages.length} invalid messages from ${queueName} queue`)
-      await queue.deleteMessages(
-        queueUrl,
-        invalidMessages.map(({ message }) => message.ReceiptHandle!)
-      )
+      await queue.deleteMessages(invalidMessages.map(({ message }) => message.ReceiptHandle!))
     }
 
     if (validMessages.length === 0) {
@@ -86,28 +83,28 @@ export async function createConsumerComponent({
       }
 
       if (result.success) {
-        await handleSuccess(message, queueUrl, result)
+        await handleSuccess(message, queue, result)
       } else {
-        await handleFailure(message, queueUrl, result)
+        await handleFailure(message, queue, result)
       }
     }
 
     if (messagesToDelete.length > 0) {
-      await queue.deleteMessages(queueUrl, messagesToDelete)
+      await queue.deleteMessages(messagesToDelete)
     }
   }
 
-  async function handleSuccess(_message: Message, queueUrl: string, result: ProcessingResult) {
-    if (isDLQ(queueUrl)) {
+  async function handleSuccess(_message: Message, queue: QueueComponent, result: ProcessingResult) {
+    if (isDLQ(queue)) {
       logger.info(`Successfully processed message from DLQ for entity ${result.entity}`)
     }
   }
 
-  async function handleFailure(message: Message, queueUrl: string, result: ProcessingResult) {
+  async function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {
     const receiveCount = getReceiveCount(message)
     const error = result.error || 'Unknown error'
 
-    if (isDLQ(queueUrl)) {
+    if (isDLQ(queue)) {
       logger.warn(`Processing failed in DLQ for entity ${result.entity}`, {
         error,
         receiveCount,

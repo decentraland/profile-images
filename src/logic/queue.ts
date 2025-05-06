@@ -12,19 +12,22 @@ import { AppComponents } from '../types'
 import { chunks } from '../utils/array'
 
 export type QueueComponent = {
-  sendMessage(queueUrl: string, message: CatalystDeploymentEvent): Promise<void>
-  receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]>
-  deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>
-  deleteMessages(queueUrl: string, receiptHandles: string[]): Promise<void>
-  getStatus(queueUrl: string): Promise<{
+  sendMessage(message: CatalystDeploymentEvent): Promise<void>
+  receiveMessage(options: ReceiveMessageOptions): Promise<Message[]>
+  deleteMessage(receiptHandle: string): Promise<void>
+  deleteMessages(receiptHandles: string[]): Promise<void>
+  getStatus(): Promise<{
     ApproximateNumberOfMessages: string
     ApproximateNumberOfMessagesNotVisible: string
     ApproximateNumberOfMessagesDelayed: string
   }>
 }
 
-export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 'sqsClient'>): Promise<QueueComponent> {
-  async function sendMessage(queueUrl: string, message: CatalystDeploymentEvent) {
+export async function createQueueComponent(
+  { sqsClient }: Pick<AppComponents, 'sqsClient'>,
+  queueUrl: string
+): Promise<QueueComponent> {
+  async function sendMessage(message: CatalystDeploymentEvent) {
     const sendCommand = new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(message)
@@ -32,7 +35,7 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     await sqsClient.sendMessage(sendCommand)
   }
 
-  async function receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]> {
+  async function receiveMessage(options: ReceiveMessageOptions): Promise<Message[]> {
     const { maxNumberOfMessages, visibilityTimeout, waitTimeSeconds, messageSystemAttributeNames } = options
 
     const receiveCommand = new ReceiveMessageCommand({
@@ -47,7 +50,7 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     return Messages
   }
 
-  async function deleteMessage(queueUrl: string, receiptHandle: string) {
+  async function deleteMessage(receiptHandle: string) {
     const deleteCommand = new DeleteMessageCommand({
       QueueUrl: queueUrl,
       ReceiptHandle: receiptHandle
@@ -55,7 +58,7 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     await sqsClient.deleteMessage(deleteCommand)
   }
 
-  async function deleteMessages(queueUrl: string, receiptHandles: string[]) {
+  async function deleteMessages(receiptHandles: string[]) {
     const batchSize = 10
     const batches = chunks(receiptHandles, batchSize)
 
@@ -71,7 +74,7 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     }
   }
 
-  async function getStatus(queueUrl: string) {
+  async function getStatus() {
     const command = new GetQueueAttributesCommand({
       QueueUrl: queueUrl,
       AttributeNames: [

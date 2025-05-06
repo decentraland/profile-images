@@ -37,7 +37,8 @@ export type BaseComponents = {
   storage: IStorageComponent
   imageProcessor: ImageProcessor
   messageValidator: MessageValidator
-  queue: QueueComponent
+  mainQueue: QueueComponent
+  dlQueue: QueueComponent
 }
 
 // components used in runtime
@@ -89,6 +90,6 @@ export type AvatarGenerationResult = ExtendedAvatar & {
 }
 
 export type QueueWorker = IBaseComponent & {
-  processMessages: (queueUrl: string, messages: Message[]) => Promise<void>
-  poll: () => Promise<{ queueUrl: string; messages: Message[] }>
+  processMessages: (queue: QueueComponent, messages: Message[]) => Promise<void>
+  poll: () => Promise<{ queue: QueueComponent; messages: Message[] }>
 }

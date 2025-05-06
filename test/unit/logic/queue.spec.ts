@@ -12,7 +12,7 @@ describe('QueueComponent', () => {
   let queue: QueueComponent
 
   beforeEach(async () => {
-    queue = await createQueueComponent({ sqsClient: mockSqsClient })
+    queue = await createQueueComponent({ sqsClient: mockSqsClient }, 'test-queue')
     jest.clearAllMocks()
   })
 
@@ -34,7 +34,7 @@ describe('QueueComponent', () => {
         authChain: []
       }
 
-      await queue.sendMessage('test-queue', message)
+      await queue.sendMessage(message)
 
       expect(mockSqsClient.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -49,7 +49,7 @@ describe('QueueComponent', () => {
     it('should handle send message errors', async () => {
       mockSqsClient.sendMessage.mockRejectedValue(new Error('Send failed'))
 
-      await expect(queue.sendMessage('test-queue', {} as CatalystDeploymentEvent)).rejects.toThrow('Send failed')
+      await expect(queue.sendMessage({} as CatalystDeploymentEvent)).rejects.toThrow('Send failed')
     })
   })
 
@@ -58,7 +58,7 @@ describe('QueueComponent', () => {
       const mockMessages = [{ MessageId: '1' }, { MessageId: '2' }]
       mockSqsClient.receiveMessages.mockResolvedValue({ Messages: mockMessages })
 
-      const messages = await queue.receiveMessage('test-queue', { maxNumberOfMessages: 2 })
+      const messages = await queue.receiveMessage({ maxNumberOfMessages: 2 })
 
       expect(messages).toEqual(mockMessages)
       expect(mockSqsClient.receiveMessages).toHaveBeenCalledWith(
@@ -76,7 +76,7 @@ describe('QueueComponent', () => {
     it('should receive messages with custom options', async () => {
       mockSqsClient.receiveMessages.mockResolvedValue({ Messages: [] })
 
-      await queue.receiveMessage('test-queue', {
+      await queue.receiveMessage({
         maxNumberOfMessages: 5,
         visibilityTimeout: 30,
         waitTimeSeconds: 10
@@ -97,7 +97,7 @@ describe('QueueComponent', () => {
     it('should handle undefined Messages in response', async () => {
       mockSqsClient.receiveMessages.mockResolvedValue({})
 
-      const messages = await queue.receiveMessage('test-queue', { maxNumberOfMessages: 1 })
+      const messages = await queue.receiveMessage({ maxNumberOfMessages: 1 })
 
       expect(messages).toEqual([])
     })
@@ -105,13 +105,13 @@ describe('QueueComponent', () => {
     it('should handle receive message errors', async () => {
       mockSqsClient.receiveMessages.mockRejectedValue(new Error('Receive failed'))
 
-      await expect(queue.receiveMessage('test-queue', { maxNumberOfMessages: 1 })).rejects.toThrow('Receive failed')
+      await expect(queue.receiveMessage({ maxNumberOfMessages: 1 })).rejects.toThrow('Receive failed')
     })
   })
 
   describe('deleteMessage', () => {
     it('should delete message', async () => {
-      await queue.deleteMessage('test-queue', 'receipt-handle')
+      await queue.deleteMessage('receipt-handle')
 
       expect(mockSqsClient.deleteMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -126,13 +126,13 @@ describe('QueueComponent', () => {
     it('should handle delete message errors', async () => {
       mockSqsClient.deleteMessage.mockRejectedValue(new Error('Delete failed'))
 
-      await expect(queue.deleteMessage('test-queue', 'receipt-handle')).rejects.toThrow('Delete failed')
+      await expect(queue.deleteMessage('receipt-handle')).rejects.toThrow('Delete failed')
     })
   })
 
   describe('deleteMessages', () => {
     it('should delete messages', async () => {
-      await queue.deleteMessages('test-queue', ['receipt-handle-1', 'receipt-handle-2'])
+      await queue.deleteMessages(['receipt-handle-1', 'receipt-handle-2'])
 
       expect(mockSqsClient.deleteMessages).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -157,7 +157,7 @@ describe('QueueComponent', () => {
       }
       mockSqsClient.getQueueAttributes.mockResolvedValue({ Attributes: mockAttributes })
 
-      const status = await queue.getStatus('test-queue')
+      const status = await queue.getStatus()
 
       expect(status).toEqual(mockAttributes)
       expect(mockSqsClient.getQueueAttributes).toHaveBeenCalledWith(
@@ -177,7 +177,7 @@ describe('QueueComponent', () => {
     it('should handle missing attributes in response', async () => {
       mockSqsClient.getQueueAttributes.mockResolvedValue({ Attributes: {} })
 
-      const status = await queue.getStatus('test-queue')
+      const status = await queue.getStatus()
 
       expect(status).toEqual({
         ApproximateNumberOfMessages: '0',
@@ -189,7 +189,7 @@ describe('QueueComponent', () => {
     it('should handle undefined Attributes in response', async () => {
       mockSqsClient.getQueueAttributes.mockResolvedValue({})
 
-      const status = await queue.getStatus('test-queue')
+      const status = await queue.getStatus()
 
       expect(status).toEqual({
         ApproximateNumberOfMessages: '0',
@@ -201,7 +201,7 @@ describe('QueueComponent', () => {
     it('should handle get status errors', async () => {
       mockSqsClient.getQueueAttributes.mockRejectedValue(new Error('Status failed'))
 
-      await expect(queue.getStatus('test-queue')).rejects.toThrow('Status failed')
+      await expect(queue.getStatus()).rejects.toThrow('Status failed')
     })
   })
 })

@@ -58,15 +58,19 @@ export async function initComponents(): Promise<AppComponents> {
 
   const messageValidator = createMessageValidator({ logs })
 
-  const queue = await createQueueComponent({ sqsClient })
+  const mainQueueUrl = await config.requireString('QUEUE_URL')
+  const mainQueue = await createQueueComponent({ sqsClient }, mainQueueUrl)
 
-  const consumer = await createConsumerComponent({
-    config,
+  const dlQueueUrl = await config.requireString('DLQ_URL')
+  const dlQueue = await createQueueComponent({ sqsClient }, dlQueueUrl)
+
+  const consumer = createConsumerComponent({
     logs,
     entityFetcher,
     imageProcessor,
     messageValidator,
-    queue
+    mainQueue,
+    dlQueue
   })
 
   return {
@@ -84,6 +88,7 @@ export async function initComponents(): Promise<AppComponents> {
     entityFetcher,
     imageProcessor,
     messageValidator,
-    queue
+    mainQueue,
+    dlQueue
   }
 }
