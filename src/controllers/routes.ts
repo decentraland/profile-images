@@ -10,7 +10,9 @@ export async function setupRouter(globalContext: GlobalContext): Promise<Router<
   router.use(errorHandler)
 
   const secret = await globalContext.components.config.getString('AUTH_SECRET')
+
   if (secret) {
+    // TODO: can we remove this endpoint?
     router.post('/schedule-processing', bearerTokenMiddleware(secret), scheduleProcessingHandler)
   }
 
