@@ -1,12 +1,12 @@
 import { createQueueComponent, QueueComponent } from '../../../src/logic/queue'
 import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
-import { Message } from '@aws-sdk/client-sqs'
 
 describe('QueueComponent', () => {
   const mockSqsClient = {
     sendMessage: jest.fn(),
     receiveMessages: jest.fn(),
     deleteMessage: jest.fn(),
+    deleteMessages: jest.fn(),
     getQueueAttributes: jest.fn()
   }
   let queue: QueueComponent
@@ -127,6 +127,24 @@ describe('QueueComponent', () => {
       mockSqsClient.deleteMessage.mockRejectedValue(new Error('Delete failed'))
 
       await expect(queue.deleteMessage('test-queue', 'receipt-handle')).rejects.toThrow('Delete failed')
+    })
+  })
+
+  describe('deleteMessages', () => {
+    it('should delete messages', async () => {
+      await queue.deleteMessages('test-queue', ['receipt-handle-1', 'receipt-handle-2'])
+
+      expect(mockSqsClient.deleteMessages).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: {
+            QueueUrl: 'test-queue',
+            Entries: [
+              { Id: 'msg_0', ReceiptHandle: 'receipt-handle-1' },
+              { Id: 'msg_1', ReceiptHandle: 'receipt-handle-2' }
+            ]
+          }
+        })
+      )
     })
   })
 

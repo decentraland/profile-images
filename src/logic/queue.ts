@@ -1,4 +1,5 @@
 import {
+  DeleteMessageBatchCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
   Message,
@@ -8,11 +9,13 @@ import {
 import { ReceiveMessageOptions } from '../types'
 import { CatalystDeploymentEvent } from '@dcl/schemas'
 import { AppComponents } from '../types'
+import { chunks } from '../utils/array'
 
 export type QueueComponent = {
   sendMessage(queueUrl: string, message: CatalystDeploymentEvent): Promise<void>
   receiveMessage(queueUrl: string, options: ReceiveMessageOptions): Promise<Message[]>
   deleteMessage(queueUrl: string, receiptHandle: string): Promise<void>
+  deleteMessages(queueUrl: string, receiptHandles: string[]): Promise<void>
   getStatus(queueUrl: string): Promise<{
     ApproximateNumberOfMessages: string
     ApproximateNumberOfMessagesNotVisible: string
@@ -52,6 +55,22 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     await sqsClient.deleteMessage(deleteCommand)
   }
 
+  async function deleteMessages(queueUrl: string, receiptHandles: string[]) {
+    const batchSize = 10
+    const batches = chunks(receiptHandles, batchSize)
+
+    for (const batch of batches) {
+      const deleteCommand = new DeleteMessageBatchCommand({
+        QueueUrl: queueUrl,
+        Entries: batch.map((receiptHandle, index) => ({
+          Id: `msg_${index}`,
+          ReceiptHandle: receiptHandle
+        }))
+      })
+      await sqsClient.deleteMessages(deleteCommand)
+    }
+  }
+
   async function getStatus(queueUrl: string) {
     const command = new GetQueueAttributesCommand({
       QueueUrl: queueUrl,
@@ -73,6 +92,7 @@ export async function createQueueComponent({ sqsClient }: Pick<AppComponents, 's
     sendMessage,
     receiveMessage,
     deleteMessage,
+    deleteMessages,
     getStatus
   }
 }

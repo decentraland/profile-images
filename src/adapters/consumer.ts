@@ -55,7 +55,13 @@ export async function createConsumerComponent({
 
     const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
 
-    await Promise.all(invalidMessages.map(({ message }) => queue.deleteMessage(queueUrl, message.ReceiptHandle!)))
+    if (invalidMessages.length > 0) {
+      logger.warn(`Deleting ${invalidMessages.length} invalid messages from ${queueName} queue`)
+      await queue.deleteMessages(
+        queueUrl,
+        invalidMessages.map(({ message }) => message.ReceiptHandle!)
+      )
+    }
 
     if (validMessages.length === 0) {
       return
@@ -69,8 +75,15 @@ export async function createConsumerComponent({
 
     const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
 
+    const messagesToDelete = []
+
     for (const result of results) {
       const message = messageByEntity.get(result.entity)!
+      const shouldDelete = result.success || !result.shouldRetry
+
+      if (shouldDelete) {
+        messagesToDelete.push(message.ReceiptHandle!)
+      }
 
       if (result.success) {
         await handleSuccess(message, queueUrl, result)
@@ -78,11 +91,13 @@ export async function createConsumerComponent({
         await handleFailure(message, queueUrl, result)
       }
     }
+
+    if (messagesToDelete.length > 0) {
+      await queue.deleteMessages(queueUrl, messagesToDelete)
+    }
   }
 
-  async function handleSuccess(message: Message, queueUrl: string, result: ProcessingResult) {
-    await queue.deleteMessage(queueUrl, message.ReceiptHandle!)
-
+  async function handleSuccess(_message: Message, queueUrl: string, result: ProcessingResult) {
     if (isDLQ(queueUrl)) {
       logger.info(`Successfully processed message from DLQ for entity ${result.entity}`)
     }
@@ -99,7 +114,6 @@ export async function createConsumerComponent({
         age: Date.now() - parseInt(message.Attributes?.SentTimestamp || '0')
       })
     } else if (!result.shouldRetry) {
-      await queue.deleteMessage(queueUrl, message.ReceiptHandle!)
       logger.warn(`Not retrying - Deleting from main queue: ${result.entity}`, {
         error,
         receiveCount

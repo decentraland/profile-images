@@ -81,6 +81,7 @@ describe('Consumer test', function () {
     it('should handle invalid messages by deleting them', async () => {
       const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const messages = [createTestMessage('1'), createTestMessage('2')]
+      const invalidReceiptHandles = messages.map((msg) => msg.ReceiptHandle!)
 
       messageValidator.validateMessages.mockReturnValueOnce({
         validMessages: [],
@@ -98,7 +99,7 @@ describe('Consumer test', function () {
 
       await consumer.processMessages(QUEUE_URL, messages)
 
-      expect(queue.deleteMessage).toHaveBeenCalledTimes(2)
+      expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, invalidReceiptHandles)
       expect(entityFetcher.getEntitiesByIds).not.toHaveBeenCalled()
     })
 
@@ -121,7 +122,7 @@ describe('Consumer test', function () {
 
         await consumer.processMessages(QUEUE_URL, [message])
 
-        expect(queue.deleteMessage).toHaveBeenCalledWith(QUEUE_URL, message.ReceiptHandle)
+        expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, [message.ReceiptHandle])
       })
 
       it('should not delete message on failure when shouldRetry is true', async () => {
@@ -142,6 +143,7 @@ describe('Consumer test', function () {
 
         await consumer.processMessages(QUEUE_URL, [message])
 
+        expect(queue.deleteMessages).not.toHaveBeenCalled()
         expect(queue.deleteMessage).not.toHaveBeenCalled()
       })
 
@@ -163,7 +165,7 @@ describe('Consumer test', function () {
 
         await consumer.processMessages(QUEUE_URL, [message])
 
-        expect(queue.deleteMessage).toHaveBeenCalledWith(QUEUE_URL, message.ReceiptHandle)
+        expect(queue.deleteMessages).toHaveBeenCalledWith(QUEUE_URL, [message.ReceiptHandle])
       })
     })
 
@@ -186,7 +188,7 @@ describe('Consumer test', function () {
 
         await consumer.processMessages(DLQ_URL, [message])
 
-        expect(queue.deleteMessage).toHaveBeenCalledWith(DLQ_URL, message.ReceiptHandle)
+        expect(queue.deleteMessages).toHaveBeenCalledWith(DLQ_URL, [message.ReceiptHandle])
       })
 
       it('should not delete message on failure (let visibility timeout expire)', async () => {
@@ -194,7 +196,7 @@ describe('Consumer test', function () {
         const entity = createTestEntity('1')
         const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
 
-        setupFailedProcessing(messageValidator, entityFetcher, imageProcessor, message, entity, true)
+        setupFailedProcessing(messageValidator, entityFetcher, imageProcessor, message, entity, true) // shouldRetry is true for DLQ failures generally
 
         const consumer = await createConsumerComponent({
           config,
@@ -207,7 +209,8 @@ describe('Consumer test', function () {
 
         await consumer.processMessages(DLQ_URL, [message])
 
-        expect(queue.deleteMessage).not.toHaveBeenCalled()
+        expect(queue.deleteMessages).not.toHaveBeenCalled()
+        expect(queue.deleteMessage).not.toHaveBeenCalled() // Ensure individual delete is also not called
       })
     })
 
@@ -215,14 +218,10 @@ describe('Consumer test', function () {
       const { queue, messageValidator, entityFetcher, imageProcessor } = createMockComponents()
       const message = createTestMessage('1')
 
-      // Mock validation to throw error
-      messageValidator.validateMessages.mockImplementationOnce(() => {
-        const error = new Error('Validation error')
-        // Return empty results on validation error
-        return {
-          validMessages: [],
-          invalidMessages: []
-        }
+      // Mock validation to return empty results (as if all failed validation before this step)
+      messageValidator.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [] // Assuming no messages even get to the deletion stage if validation itself errors
       })
 
       const consumer = await createConsumerComponent({
@@ -236,8 +235,9 @@ describe('Consumer test', function () {
 
       await consumer.processMessages(QUEUE_URL, [message])
 
-      // On validation error, processing should not continue
+      // On validation error (or no valid/invalid messages returned), processing should not continue to delete
       expect(entityFetcher.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(queue.deleteMessages).not.toHaveBeenCalled()
       expect(queue.deleteMessage).not.toHaveBeenCalled()
     })
   })
@@ -318,6 +318,7 @@ describe('Consumer test', function () {
       receiveMessage: jest.fn(),
       sendMessage: jest.fn(),
       deleteMessage: jest.fn(),
+      deleteMessages: jest.fn(),
       getStatus: jest.fn().mockReturnValue({ isProcessing: false })
     }
 

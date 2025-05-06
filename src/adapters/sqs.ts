@@ -1,4 +1,6 @@
 import {
+  DeleteMessageBatchCommand,
+  DeleteMessageBatchCommandOutput,
   DeleteMessageCommand,
   DeleteMessageCommandOutput,
   GetQueueAttributesCommand,
@@ -16,6 +18,7 @@ export type SqsClient = {
   getQueueAttributes(payload: GetQueueAttributesCommand): Promise<GetQueueAttributesCommandOutput>
   receiveMessages(payload: ReceiveMessageCommand): Promise<ReceiveMessageCommandOutput>
   deleteMessage(payload: DeleteMessageCommand): Promise<DeleteMessageCommandOutput>
+  deleteMessages(payload: DeleteMessageBatchCommand): Promise<DeleteMessageBatchCommandOutput>
 }
 
 export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsConfig'>): Promise<SqsClient> {
@@ -37,10 +40,15 @@ export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsCon
     return client.send(payload)
   }
 
+  function deleteMessages(payload: DeleteMessageBatchCommand): Promise<DeleteMessageBatchCommandOutput> {
+    return client.send(payload)
+  }
+
   return {
     sendMessage,
     getQueueAttributes,
     receiveMessages,
-    deleteMessage
+    deleteMessage,
+    deleteMessages
   }
 }
