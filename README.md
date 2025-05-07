@@ -23,14 +23,15 @@ Set the next variables for local env:
 export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
+export AWS_ENDPOINT="http://localhost:4566"
 ```
 
 Once you have everything above setup, do the following:
 
 - Run `localstack start` on a separate terminal an leave it running
 - Run `awslocal sqs create-queue --queue-name profile-images-queue` to create an SQS
-- Run `awslocal sqs create-queue --queue-name profile-images-retry-queue` to create the retry SQS
-- Run `awslocal s3api create-bucket --bucket profile-images-bucket` to create an S3
+- Run `awslocal sqs create-queue --queue-name profile-images-dlq` to create the DLQ
+- Run `awslocal s3api create-bucket --bucket profile-images-bucket` to create an S3 bucket
 
 Now copy the env variables from the example:
 

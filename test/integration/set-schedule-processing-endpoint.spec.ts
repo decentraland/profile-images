@@ -3,7 +3,7 @@ import { test } from '../components'
 test('set-schedule-processing endpoint', function ({ components, stubComponents }) {
   it.skip('responds /schedule-processing', async () => {
     const { localFetch } = components
-    const { fetch, producer, sqsClient, storage } = stubComponents
+    const { fetch, storage } = stubComponents
 
     // fetch.fetch.mockResolvedValueOnce(
     //   new Response(
@@ -22,7 +22,6 @@ test('set-schedule-processing endpoint', function ({ components, stubComponents 
       body: JSON.stringify(['abcd'])
     })
     expect(r.status).toBe(204)
-    expect(producer.changeLastRun).toHaveBeenCalledWith(1234)
   })
 
   it.skip('responds /schedule-processing without proper body', async () => {
@@ -43,13 +42,12 @@ test('set-schedule-processing endpoint', function ({ components, stubComponents 
   })
 
   it('rejects /schedule-processing without auth token', async () => {
-    const { localFetch, producer } = components
+    const { localFetch } = components
 
     const r = await localFetch.fetch('/schedule-processing', {
       method: 'POST',
       body: JSON.stringify({})
     })
     expect(r.status).toBe(401)
-    expect(producer.changeLastRun).not.toHaveBeenCalled()
   })
 })

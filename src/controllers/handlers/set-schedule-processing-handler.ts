@@ -1,18 +1,17 @@
 import { Entity, Profile } from '@dcl/schemas'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 import { HandlerContextWithPath } from '../../types'
-import { sqsSendMessage } from '../../logic/queue'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'logs' | 'sqsClient' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'mainQueue' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, sqsClient, storage: _storage, fetch, config }
+    components: { logs, mainQueue: _queue, storage: _storage, fetch, config }
   } = context
 
-  const [mainQueueUrl, peerUrl] = await Promise.all([
+  const [_mainQueueUrl, peerUrl] = await Promise.all([
     config.requireString('QUEUE_NAME'),
     config.requireString('PEER_URL')
   ])
@@ -36,7 +35,12 @@ export async function scheduleProcessingHandler(
 
   for (const entity of data.deployments) {
     const profile: Profile = entity.metadata
-    await sqsSendMessage(sqsClient, mainQueueUrl, { entity: entity.entityId, avatar: profile.avatars[0].avatar })
+    const avatar = profile.avatars[0].avatar
+    logger.debug(`Processing entity="${entity.entityId}" avatar="${avatar}"`)
+
+    // TODO: process image directly without enqueuing the message
+    // await queue.sendMessage(mainQueueUrl, { entity: entity.entityId, avatar })
+
     logger.debug(`Added to queue entity="${entity.entityId}"`)
   }
 
