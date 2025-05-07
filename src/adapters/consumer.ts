@@ -64,6 +64,7 @@ export async function createConsumerComponent({
       input.push(body)
     }
 
+    logger.debug(`Processing: ${input[0].entity} entity`)
     const { avatars: results, output: outputGenerated } = await godot.generateImages(input)
 
     for (const result of results) {
