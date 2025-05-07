@@ -1,5 +1,5 @@
 import path from 'path'
-import { exec } from 'child_process'
+import { exec, ExecException } from 'child_process'
 import { writeFile } from 'fs/promises'
 import { stat, mkdir, rm } from 'fs/promises'
 import { AppComponents, AvatarGenerationResult, ExtendedAvatar } from '../types'
@@ -37,13 +37,52 @@ export async function createGodotSnapshotComponent({
   const peerUrl = await config.requireString('PEER_URL')
   const logger = logs.getLogger('godot-snapshot')
   const explorerPath = process.env.EXPLORER_PATH || '.'
-  const godotEditorPath = `${explorerPath}/decentraland.godot.client.x86_64`
+  const godotEditorFileName = 'decentraland.godot.client.x86_64'
+  const godotEditorPath = `${explorerPath}/${godotEditorFileName}`
   const baseTime = (await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000
   const timePerAvatar = (await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000
 
   let executionNumber = 0
 
   function runGodot(input: GodotInput): Promise<{ error: boolean; stderr: string; stdout: string }> {
+    // Helper: kill all processes whose command line matches the Godot executable.
+    const killProcessTree = () => {
+      // Adjust the match pattern if needed.
+      const pkillCommand = `pkill -9 -f "${godotEditorFileName}"`
+      exec(pkillCommand, (err, _stdout, _stderr) => {
+        if (err) {
+          // pkill returns code 1 if no process was matched; ignore that.
+          if ((err as any).code !== 1) {
+            logger.error('Error executing pkill for godot process tree', {
+              message: (err as Error).message
+            })
+          }
+        }
+      })
+    }
+
+    // Helper: kill the process group and then ensure the entire tree is killed.
+    const killProcessGroup = (childProcessPid: number | undefined) => {
+      if (childProcessPid !== undefined) {
+        try {
+          // Attempt to kill the entire process group.
+          process.kill(-childProcessPid, 'SIGKILL')
+        } catch (e: unknown) {
+          if (e instanceof Error && (e as any).code === 'ESRCH') {
+            // Process group already terminated.
+          } else if (e instanceof Error) {
+            logger.error('Error when killing process group', { message: e.message })
+          } else {
+            logger.error('Error when killing process group', { error: String(e) })
+          }
+        }
+      } else {
+        logger.error('childProcess.pid is undefined; cannot kill process group')
+      }
+      // Additionally, call pkill to catch any stray Godot processes.
+      killProcessTree()
+    }
+
     return new Promise(async (resolve) => {
       executionNumber += 1
       const timeout = baseTime + input.payload.length * timePerAvatar
@@ -58,78 +97,48 @@ export async function createGodotSnapshotComponent({
 
       let resolved = false
 
-      const childProcess = exec(command, { timeout }, (error, stdout, stderr) => {
-        if (resolved) {
-          return
-        }
-
-        // Clean up the temporary avatar data file.
-        rm(avatarDataPath).catch(logger.error)
-        if (error) {
-          for (const f of globSync('core.*')) {
-            rm(f).catch(logger.error)
-          }
-          resolved = true
-          return resolve({ error: true, stdout, stderr })
-        }
-        resolved = true
-        resolve({ error: false, stdout: stdout, stderr })
-      })
-
-      const childProcessPid = childProcess.pid
-
-      // Helper: kill all processes whose command line matches the Godot executable.
-      const killProcessTree = () => {
-        // Adjust the match pattern if needed.
-        const pkillCommand = `pkill -9 -f "${godotEditorPath}"`
-        exec(pkillCommand, (err, _stdout, _stderr) => {
-          if (err) {
-            // pkill returns code 1 if no process was matched; ignore that.
-            if ((err as any).code !== 1) {
-              logger.error('Error executing pkill for godot process tree', {
-                message: (err as Error).message
-              })
-            }
-          }
-        })
-      }
-
-      // Helper: kill the process group and then ensure the entire tree is killed.
-      const killProcessGroup = () => {
-        if (childProcessPid !== undefined) {
-          try {
-            // Attempt to kill the entire process group.
-            process.kill(-childProcessPid, 'SIGKILL')
-          } catch (e: unknown) {
-            if (e instanceof Error && (e as any).code === 'ESRCH') {
-              // Process group already terminated.
-            } else if (e instanceof Error) {
-              logger.error('Error when killing process group', { message: e.message })
-            } else {
-              logger.error('Error when killing process group', { error: String(e) })
-            }
-          }
-        } else {
-          logger.error('childProcess.pid is undefined; cannot kill process group')
-        }
-        // Additionally, call pkill to catch any stray Godot processes.
-        killProcessTree()
-      }
-
-      childProcess.on('close', (_code, signal) => {
-        // If a SIGTERM was received, try to kill the process group.
-        if (signal === 'SIGTERM') {
-          killProcessGroup()
-        }
-      })
-
-      setTimeout(() => {
-        killProcessGroup()
+      // Set a failsafe timeout that will kill the process group if the command hasn't finished.
+      const timeoutHandler: NodeJS.Timeout = setTimeout(() => {
+        killProcessGroup(childProcessPid)
         if (!resolved) {
           resolved = true
           resolve({ error: true, stdout: '', stderr: 'timeout' })
         }
       }, timeout + 5000)
+
+      // Execute the command via exec (which spawns a shell)
+      const childProcess = exec(
+        command,
+        { timeout } as any,
+        (error: ExecException | null, stdout: string, stderr: string) => {
+          if (resolved) return
+          clearTimeout(timeoutHandler)
+          if (error) {
+            for (const f of globSync('core.*')) {
+              rm(f).catch(logger.error)
+            }
+            resolved = true
+            return resolve({ error: true, stdout, stderr })
+          }
+          resolved = true
+          resolve({ error: false, stdout, stderr })
+        }
+      )
+
+      // Let the child process run independently.
+      if (typeof childProcess.unref === 'function') {
+        childProcess.unref()
+      }
+
+      // Save the child's PID.
+      const childProcessPid = childProcess.pid
+
+      childProcess.on('close', (_code, signal) => {
+        // If a SIGTERM was received, try to kill the process group.
+        if (signal === 'SIGTERM') {
+          killProcessGroup(childProcessPid)
+        }
+      })
     })
   }
 
