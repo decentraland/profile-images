@@ -2,6 +2,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
 import { sleep } from '../logic/sleep'
 import { sqsDeleteMessage, sqsReceiveMessage, sqsSendMessage } from '../logic/queue'
+import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 
 export async function createConsumerComponent({
   config,
@@ -18,6 +19,8 @@ export async function createConsumerComponent({
     config.getString('COMMIT_HASH'),
     config.getString('CURRENT_VERSION')
   ])
+
+  let processLoopPromise: Promise<void> | null = null
 
   async function poll() {
     let queueUrl = mainQueueUrl
@@ -96,18 +99,41 @@ export async function createConsumerComponent({
     }
   }
 
-  async function start() {
-    logger.debug('Starting consumer')
+  async function processLoop() {
     while (true) {
-      const { queueUrl, messages } = await poll()
+      try {
+        const { queueUrl, messages } = await poll()
 
-      if (messages.length === 0) {
-        await sleep(20 * 1000)
-        continue
+        if (messages.length === 0) {
+          await sleep(20 * 1000)
+          continue
+        }
+
+        await process(queueUrl, messages)
+      } catch (error: any) {
+        logger.error(error)
       }
-      await process(queueUrl, messages)
     }
   }
 
-  return { start, process, poll }
+  async function start() {
+    logger.debug('Starting consumer')
+
+    // Start the processing loop in the background
+    processLoopPromise = processLoop()
+
+    // Return immediately to not block other components
+    return Promise.resolve()
+  }
+
+  async function stop() {
+    logger.info('Stopping messages consumer component')
+
+    if (processLoopPromise) {
+      await processLoopPromise
+      processLoopPromise = null
+    }
+  }
+
+  return { [START_COMPONENT]: start, [STOP_COMPONENT]: stop, process, poll }
 }

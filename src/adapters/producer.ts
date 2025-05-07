@@ -2,7 +2,7 @@ import { AppComponents, ExtendedAvatar } from '../types'
 import { sleep } from '../logic/sleep'
 import { Entity, EntityType, Profile } from '@dcl/schemas'
 import { sqsSendMessage } from '../logic/queue'
-import { IBaseComponent } from '@well-known-components/interfaces'
+import { IBaseComponent, START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
 
 type Delta = Omit<Entity, 'metadata' | 'id'> & { metadata: Profile; entityId: string; localTimestamp: number }
 
@@ -40,6 +40,7 @@ export async function createProducerComponent({
   ])
 
   let lastRun = Date.now() - interval
+  let processLoopPromise: Promise<void> | null = null
 
   async function poll(lastTimestamp: number): Promise<number> {
     let url = `${peerUrl}/content/pointer-changes?entityType=${
@@ -90,9 +91,20 @@ export async function createProducerComponent({
     await storage.storeLastCheckedTimestamp(lastRun)
   }
 
-  async function start() {
-    logger.info('Starting producer')
+  async function processLoop() {
+    while (true) {
+      try {
+        lastRun = await poll(lastRun)
+        await storage.storeLastCheckedTimestamp(lastRun)
+      } catch (error: any) {
+        logger.error(error)
+      } finally {
+        await sleep(interval)
+      }
+    }
+  }
 
+  async function start() {
     const lastCheckedTs = await storage.retrieveLastCheckedTimestamp()
     if (lastCheckedTs) {
       lastRun = lastCheckedTs
@@ -101,16 +113,22 @@ export async function createProducerComponent({
     }
     logger.info(`Starting from ${lastRun}.`)
 
-    while (true) {
-      try {
-        lastRun = await poll(lastRun)
-        await storage.storeLastCheckedTimestamp(lastRun)
-      } catch (error: any) {
-        logger.error(error)
-      }
-      await sleep(interval)
+    // Start the processing loop in the background
+    processLoopPromise = processLoop()
+
+    // Return immediately to not block other components
+    return Promise.resolve()
+  }
+
+  async function stop() {
+    logger.info('Stopping messages producer component')
+    lastRun = Date.now()
+
+    if (processLoopPromise) {
+      await processLoopPromise
+      processLoopPromise = null
     }
   }
 
-  return { start, changeLastRun, poll }
+  return { [START_COMPONENT]: start, [STOP_COMPONENT]: stop, changeLastRun, poll }
 }
