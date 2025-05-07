@@ -12,6 +12,8 @@ import { IStorageComponent } from '../src/adapters/storage'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { SqsClient } from '../src/adapters/sqs'
 import { createInMemorySqs } from './mocks/sqs-mock'
+import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
+import { createQueueComponent } from '../src/logic/queue'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -28,7 +30,9 @@ export const test = createRunner<TestComponents>({
 async function initComponents(): Promise<TestComponents> {
   const components = await originalInitComponents()
 
-  const { config } = components
+  const config = await createDotEnvConfigComponent({
+    path: ['.env.default', '.env', '.env.test']
+  })
 
   const metrics = createTestMetricsComponent(metricDeclarations)
 
@@ -59,6 +63,12 @@ async function initComponents(): Promise<TestComponents> {
   // }
   const sqsClient: SqsClient = createInMemorySqs()
 
+  const mainQueueUrl = await config.requireString('QUEUE_URL')
+  const mainQueue = await createQueueComponent({ sqsClient }, mainQueueUrl)
+
+  const dlQueueUrl = await config.requireString('DLQ_URL')
+  const dlQueue = await createQueueComponent({ sqsClient }, dlQueueUrl)
+
   const consumer: QueueWorker = {
     poll: jest.fn(),
     processMessages: jest.fn()
@@ -71,6 +81,8 @@ async function initComponents(): Promise<TestComponents> {
     fetch,
     metrics,
     sqsClient,
+    mainQueue,
+    dlQueue,
     storage
   }
 }
