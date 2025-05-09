@@ -1,20 +1,15 @@
-import { Entity, Profile } from '@dcl/schemas'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
-import { HandlerContextWithPath } from '../../types'
 import { InvalidRequestError } from '@dcl/platform-server-commons'
+import { HandlerContextWithPath } from '../../types'
 
 export async function scheduleProcessingHandler(
-  context: HandlerContextWithPath<'logs' | 'mainQueue' | 'storage' | 'fetch' | 'config', '/schedule-processing'>
+  context: HandlerContextWithPath<'logs' | 'entityFetcher' | 'imageProcessor', '/schedule-processing'>
 ): Promise<IHttpServerComponent.IResponse> {
   const {
     request,
-    components: { logs, mainQueue: _queue, storage: _storage, fetch, config }
+    components: { logs, entityFetcher, imageProcessor }
   } = context
 
-  const [_mainQueueUrl, peerUrl] = await Promise.all([
-    config.requireString('QUEUE_NAME'),
-    config.requireString('PEER_URL')
-  ])
   const logger = logs.getLogger('schedule-processing-handler')
 
   const body = await request.json()
@@ -22,29 +17,34 @@ export async function scheduleProcessingHandler(
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }
 
-  // TODO: failures will be deleted manually, let keep this comment to revise in the future
-  // await storage.deleteFailures(body)
+  try {
+    const entities = await entityFetcher.getEntitiesByIds(body.map((entity) => entity.entityId))
+    const results = await imageProcessor.processEntities(entities)
 
-  const response = await fetch.fetch(
-    `${peerUrl}/content/deployments?` +
-      new URLSearchParams([['entityType', 'profile'], ...body.map((entityId) => ['entityId', entityId])]),
-    {}
-  )
+    for (const result of results) {
+      if (result.success) {
+        logger.debug(`Successfully processed entity="${result.entity}"`)
+      } else {
+        logger.error(`Failed to process entity="${result.entity}": ${result.error}`)
+      }
+    }
 
-  const data: { deployments: (Entity & { entityId: string })[] } = await response.json()
-
-  for (const entity of data.deployments) {
-    const profile: Profile = entity.metadata
-    const avatar = profile.avatars[0].avatar
-    logger.debug(`Processing entity="${entity.entityId}" avatar="${avatar}"`)
-
-    // TODO: process image directly without enqueuing the message
-    // await queue.sendMessage(mainQueueUrl, { entity: entity.entityId, avatar })
-
-    logger.debug(`Added to queue entity="${entity.entityId}"`)
-  }
-
-  return {
-    status: 204
+    return {
+      status: 200,
+      body: JSON.stringify({
+        results: results.map((result) => ({
+          entity: result.entity,
+          success: result.success,
+          shouldRetry: result.shouldRetry,
+          error: result.error
+        }))
+      })
+    }
+  } catch (error: any) {
+    logger.error('Error processing entities', error)
+    return {
+      status: 500,
+      body: JSON.stringify({ error: 'Internal server error' })
+    }
   }
 }
