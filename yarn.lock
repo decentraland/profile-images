@@ -1007,19 +1007,20 @@
     eslint-plugin-prettier "^5.1.3"
     prettier "^3.3.2"
 
-"@dcl/platform-server-commons@^0.0.5":
-  version "0.0.5"
-  resolved "https://registry.yarnpkg.com/@dcl/platform-server-commons/-/platform-server-commons-0.0.5.tgz#2eaaef2125a699b08be93fe3402c2f4771ad3fe5"
-  integrity sha512-ATMZ57rEx6rAZzN5SSkgAHyqKPfuLN0tpnljERGTUegbUNjFxjrxaVzIz+r2UeW8lTIYaUl1sxhTt7udBDp+Qw==
+"@dcl/platform-server-commons@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@dcl/platform-server-commons/-/platform-server-commons-0.2.0.tgz#cb688aa3f90bdc350fe74290aec242001acd4950"
+  integrity sha512-ijczFKcvgHli99bxJBw2LdZemsyY1aP/f2ccYuMT85rTla9py9vsYxdAuLlb/UN8FiBTQ1cvqgWK97O6i1llnw==
   dependencies:
+    "@dcl/schemas" "^16.9.0"
     "@well-known-components/http-server" "^2.1.0"
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
-"@dcl/schemas@^16.8.0":
-  version "16.8.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.8.0.tgz#80f0e1d09ce20c92c0983ae510f275aa653875d2"
-  integrity sha512-4jl8VzcndiT/QECTMz4aWFjTjLMo4UIGOdLihcNf3d3bFxuYLUP5NmKFxwIUl7kaegQ5EbiyZmScl7vcwbOYXQ==
+"@dcl/schemas@^16.8.0", "@dcl/schemas@^16.9.0":
+  version "16.13.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.13.0.tgz#c44259271b5e7d45110e893f2f114ce0fd1b67fc"
+  integrity sha512-Wcu2tHomUX83bsv6HSbnGKKWypkZUVGGjgtB7MImJbdzccB2FgKzvi47fLADgLjZave4lymFIm/oldWTgtEtzA==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
