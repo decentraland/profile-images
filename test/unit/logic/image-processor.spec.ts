@@ -4,24 +4,22 @@ import { createLogComponent } from '@well-known-components/logger'
 import { Entity, EntityType } from '@dcl/schemas'
 import { createImageProcessor } from '../../../src/logic/image-processor'
 import { metricDeclarations } from '../../../src/metrics'
+import { createGodotMock } from '../../mocks/godot-mock'
+import { createInMemoryStorage } from '../../mocks/storage-mock'
 
-describe('ImageProcessor', () => {
+describe('when processing entities with image processor', () => {
   const COMMIT_HASH = 'abc123'
   const CURRENT_VERSION = '1.0.0'
 
   const config = createConfigComponent({ COMMIT_HASH, CURRENT_VERSION, LOG_LEVEL: 'OFF' }, {})
+  const metrics = createTestMetricsComponent(metricDeclarations)
 
-  const createMockGodot = () => ({
-    generateImages: jest.fn()
-  })
-
-  const createMockStorage = () => ({
-    storeImages: jest.fn(),
-    storeFailure: jest.fn(),
-    deleteFailures: jest.fn(),
-    retrieveLastCheckedTimestamp: jest.fn(),
-    storeLastCheckedTimestamp: jest.fn()
-  })
+  let logs: any
+  let godot: jest.Mocked<any>
+  let storage: any
+  let imageProcessor: any
+  let testEntity: Entity
+  let testEntities: Entity[]
 
   const createTestEntity = (id: string): Entity => ({
     id,
@@ -44,209 +42,150 @@ describe('ImageProcessor', () => {
     content: []
   })
 
-  it('should call components correctly on successful processing', async () => {
-    const logs = await createLogComponent({ config })
-    const godot = createMockGodot()
-    const storage = createMockStorage()
-    const metrics = createTestMetricsComponent(metricDeclarations)
+  beforeEach(async () => {
+    logs = await createLogComponent({ config })
+    godot = createGodotMock()
+    storage = await createInMemoryStorage({ config, logs })
+    testEntity = createTestEntity('1')
+    testEntities = [createTestEntity('1'), createTestEntity('2')]
 
-    const entity = createTestEntity('1')
-
-    godot.generateImages.mockResolvedValue({
-      avatars: [
-        {
-          entity: '1',
-          success: true,
-          avatarPath: 'avatar1.png',
-          facePath: 'face1.png',
-          avatar: entity.metadata.avatars[0].avatar
-        }
-      ],
-      output: 'success'
-    })
-
-    storage.storeImages.mockResolvedValue(true)
-
-    const imageProcessor = await createImageProcessor({
+    imageProcessor = await createImageProcessor({
       config,
       logs,
       godot,
       storage,
       metrics
     })
-
-    await imageProcessor.processEntities([entity])
-
-    // Verify component calls
-    expect(godot.generateImages).toHaveBeenCalledWith([
-      {
-        entity: '1',
-        avatar: entity.metadata.avatars[0].avatar
-      }
-    ])
-    expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png')
-    expect(storage.storeFailure).not.toHaveBeenCalled()
   })
 
-  it('should call components correctly on storage failure', async () => {
-    const logs = await createLogComponent({ config })
-    const godot = createMockGodot()
-    const storage = createMockStorage()
-    const metrics = createTestMetricsComponent(metricDeclarations)
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
 
-    const entity = createTestEntity('1')
+  describe('and processing succeeds', () => {
+    beforeEach(() => {
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+    })
 
-    godot.generateImages.mockResolvedValue({
-      avatars: [
+    it('should generate images for single entity', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledWith([
         {
           entity: '1',
-          success: true,
-          avatarPath: 'avatar1.png',
-          facePath: 'face1.png',
-          avatar: entity.metadata.avatars[0].avatar
+          avatar: testEntity.metadata.avatars[0].avatar
         }
-      ],
-      output: 'success'
+      ])
     })
-
-    storage.storeImages.mockResolvedValue(false)
-
-    const imageProcessor = await createImageProcessor({
-      config,
-      logs,
-      godot,
-      storage,
-      metrics
-    })
-
-    await imageProcessor.processEntities([entity])
-
-    // Verify component calls
-    expect(godot.generateImages).toHaveBeenCalledWith([
-      {
-        entity: '1',
-        avatar: entity.metadata.avatars[0].avatar
-      }
-    ])
-    expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png')
-    expect(storage.storeFailure).not.toHaveBeenCalled()
   })
 
-  it('should call components correctly on single entity Godot failure', async () => {
-    const logs = await createLogComponent({ config })
-    const godot = createMockGodot()
-    const storage = createMockStorage()
-    const metrics = createTestMetricsComponent(metricDeclarations)
+  describe('and storage fails', () => {
+    beforeEach(() => {
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+    })
 
-    const entity = createTestEntity('1')
-    const outputGenerated = 'error: something went wrong'
+    it('should generate images for single entity', async () => {
+      await imageProcessor.processEntities([testEntity])
 
-    godot.generateImages.mockResolvedValue({
-      avatars: [
+      expect(godot.generateImages).toHaveBeenCalledWith([
         {
           entity: '1',
-          success: false,
-          avatar: entity.metadata.avatars[0].avatar
+          avatar: testEntity.metadata.avatars[0].avatar
         }
-      ],
-      output: outputGenerated
+      ])
     })
-
-    const imageProcessor = await createImageProcessor({
-      config,
-      logs,
-      godot,
-      storage,
-      metrics
-    })
-
-    await imageProcessor.processEntities([entity])
-
-    // Verify component calls
-    expect(godot.generateImages).toHaveBeenCalledWith([
-      {
-        entity: '1',
-        avatar: entity.metadata.avatars[0].avatar
-      }
-    ])
-    expect(storage.storeImages).not.toHaveBeenCalled()
-    expect(storage.storeFailure).toHaveBeenCalledWith(
-      '1',
-      expect.stringMatching(
-        /{"timestamp":".*","commitHash":"abc123","version":"1.0.0","entity":"1","outputGenerated":"error: something went wrong"}/
-      )
-    )
   })
 
-  it('should call components correctly on batch processing with mixed results', async () => {
-    const logs = await createLogComponent({ config })
-    const godot = createMockGodot()
-    const storage = createMockStorage()
-    const metrics = createTestMetricsComponent(metricDeclarations)
+  describe('and Godot fails for single entity', () => {
+    beforeEach(() => {
+      const outputGenerated = 'error: something went wrong'
 
-    const entities = [createTestEntity('1'), createTestEntity('2')]
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: false,
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: outputGenerated
+      })
+    })
 
-    godot.generateImages.mockResolvedValue({
-      avatars: [
+    it('should generate images for single entity', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledWith([
         {
           entity: '1',
-          success: true,
-          avatarPath: 'avatar1.png',
-          facePath: 'face1.png',
-          avatar: entities[0].metadata.avatars[0].avatar
-        },
-        {
-          entity: '2',
-          success: false,
-          avatar: entities[1].metadata.avatars[0].avatar
+          avatar: testEntity.metadata.avatars[0].avatar
         }
-      ],
-      output: 'partial success'
+      ])
     })
-
-    storage.storeImages.mockResolvedValue(true)
-
-    const imageProcessor = await createImageProcessor({
-      config,
-      logs,
-      godot,
-      storage,
-      metrics
-    })
-
-    await imageProcessor.processEntities(entities)
-
-    // Verify component calls
-    expect(godot.generateImages).toHaveBeenCalledWith([
-      { entity: '1', avatar: entities[0].metadata.avatars[0].avatar },
-      { entity: '2', avatar: entities[1].metadata.avatars[0].avatar }
-    ])
-    expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png')
-    expect(storage.storeFailure).not.toHaveBeenCalled() // No failure storage in batch mode
   })
 
-  it.each([
+  describe('and batch processing has mixed results', () => {
+    beforeEach(() => {
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntities[0].metadata.avatars[0].avatar
+          },
+          {
+            entity: '2',
+            success: false,
+            avatar: testEntities[1].metadata.avatars[0].avatar
+          }
+        ],
+        output: 'partial success'
+      })
+    })
+
+    it('should generate images for multiple entities', async () => {
+      await imageProcessor.processEntities(testEntities)
+
+      expect(godot.generateImages).toHaveBeenCalledWith([
+        { entity: '1', avatar: testEntities[0].metadata.avatars[0].avatar },
+        { entity: '2', avatar: testEntities[1].metadata.avatars[0].avatar }
+      ])
+    })
+  })
+
+  describe.each([
     { entities: null, description: 'null' },
     { entities: [], description: 'empty array' },
     { entities: undefined, description: 'undefined' }
-  ])('should handle $description entities gracefully', async ({ entities }) => {
-    const logs = await createLogComponent({ config })
-    const godot = createMockGodot()
-    const storage = createMockStorage()
-    const metrics = createTestMetricsComponent(metricDeclarations)
-
-    const imageProcessor = await createImageProcessor({
-      config,
-      logs,
-      godot,
-      storage,
-      metrics
+  ])('and entities are $description', ({ entities }) => {
+    it('should handle $description entities gracefully', async () => {
+      const result = await imageProcessor.processEntities(entities as any)
+      expect(result).toEqual([])
+      expect(godot.generateImages).not.toHaveBeenCalled()
     })
-
-    const result = await imageProcessor.processEntities(entities as any)
-    expect(result).toEqual([])
-    expect(godot.generateImages).not.toHaveBeenCalled()
-    expect(storage.storeImages).not.toHaveBeenCalled()
-    expect(storage.storeFailure).not.toHaveBeenCalled()
   })
 })

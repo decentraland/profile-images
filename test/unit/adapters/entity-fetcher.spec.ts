@@ -10,25 +10,25 @@ jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
 const PEER_URL = 'https://peer.decentraland.org'
 const ENV = 'test'
 
-describe('EntityFetcher', () => {
+describe('when fetching entities by IDs', () => {
   const fetch = {
     fetch: jest.fn()
   }
 
   const config = createConfigComponent({ PEER_URL, ENV }, {})
 
-  const mockEntity: Entity = {
-    id: 'test-entity',
-    type: EntityType.PROFILE,
-    version: 'v3',
-    timestamp: 1234567890,
-    pointers: ['0x123'],
-    content: [],
-    metadata: {}
-  }
+  let mockEntity: Entity
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    mockEntity = {
+      id: 'test-entity',
+      type: EntityType.PROFILE,
+      version: 'v3',
+      timestamp: 1234567890,
+      pointers: ['0x123'],
+      content: [],
+      metadata: {}
+    }
 
     const mockCatalystServers = [
       { address: 'https://peer1.decentraland.org' },
@@ -38,13 +38,21 @@ describe('EntityFetcher', () => {
     ;(contractSnapshots.getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalystServers)
   })
 
-  describe('getEntitiesByIds', () => {
-    it('should fetch entities successfully from default content client', async () => {
-      const mockContentClient = {
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('and using default content client', () => {
+    let mockContentClient: any
+
+    beforeEach(() => {
+      mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+    })
 
+    it('should fetch entities successfully', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'])
 
@@ -55,13 +63,17 @@ describe('EntityFetcher', () => {
       })
       expect(mockContentClient.fetchEntitiesByIds).toHaveBeenCalledWith(['test-entity'])
     })
+  })
 
-    it('should use custom content server URL when provided', async () => {
+  describe('and using custom content server URL', () => {
+    beforeEach(() => {
       const mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+    })
 
+    it('should use the custom server URL', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       await entityFetcher.getEntitiesByIds(['test-entity'], {
         contentServerUrl: 'https://custom-peer.decentraland.org'
@@ -72,19 +84,25 @@ describe('EntityFetcher', () => {
         url: 'https://custom-peer.decentraland.org'
       })
     })
+  })
 
-    it('should retry with different catalyst servers on failure', async () => {
-      const mockContentClient1 = {
+  describe('and first server fails', () => {
+    let mockContentClient1: any
+    let mockContentClient2: any
+
+    beforeEach(() => {
+      mockContentClient1 = {
         fetchEntitiesByIds: jest.fn().mockRejectedValue(new Error('Server 1 failed'))
       }
-      const mockContentClient2 = {
+      mockContentClient2 = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
       }
-
       ;(catalystClient.createContentClient as jest.Mock)
         .mockReturnValueOnce(mockContentClient1)
         .mockReturnValueOnce(mockContentClient2)
+    })
 
+    it('should retry with different catalyst server', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], { retries: 3 })
 
@@ -92,9 +110,13 @@ describe('EntityFetcher', () => {
       expect(mockContentClient1.fetchEntitiesByIds).toHaveBeenCalled()
       expect(mockContentClient2.fetchEntitiesByIds).toHaveBeenCalled()
     })
+  })
 
-    it('should respect custom retry settings', async () => {
-      const mockContentClient = {
+  describe('and multiple retries are needed', () => {
+    let mockContentClient: any
+
+    beforeEach(() => {
+      mockContentClient = {
         fetchEntitiesByIds: jest
           .fn()
           .mockRejectedValueOnce(new Error('Try 1'))
@@ -102,7 +124,9 @@ describe('EntityFetcher', () => {
           .mockResolvedValue([mockEntity])
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+    })
 
+    it('should respect custom retry settings', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], {
         retries: 3,
@@ -112,22 +136,32 @@ describe('EntityFetcher', () => {
       expect(result).toEqual([mockEntity])
       expect(mockContentClient.fetchEntitiesByIds).toHaveBeenCalledTimes(3)
     })
+  })
 
-    it('should fail after exhausting all retries', async () => {
-      const mockContentClient = {
+  describe('and all retries are exhausted', () => {
+    let mockContentClient: any
+
+    beforeEach(() => {
+      mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockRejectedValue(new Error('Server error'))
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+    })
 
+    it('should fail after exhausting all retries', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
 
       await expect(entityFetcher.getEntitiesByIds(['test-entity'], { retries: 2 })).rejects.toThrow('Server error')
 
       expect(mockContentClient.fetchEntitiesByIds).toHaveBeenCalledTimes(2)
     })
+  })
 
-    it('should rotate through available catalyst servers', async () => {
-      const mockContentClients = [
+  describe('and rotating through multiple servers', () => {
+    let mockContentClients: any[]
+
+    beforeEach(() => {
+      mockContentClients = [
         { fetchEntitiesByIds: jest.fn().mockRejectedValue(new Error('Server 1 failed')) },
         { fetchEntitiesByIds: jest.fn().mockRejectedValue(new Error('Server 2 failed')) },
         { fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity]) }
@@ -135,7 +169,9 @@ describe('EntityFetcher', () => {
 
       let clientIndex = 0
       ;(catalystClient.createContentClient as jest.Mock).mockImplementation(() => mockContentClients[clientIndex++])
+    })
 
+    it('should rotate through available catalyst servers', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], { retries: 3 })
 
@@ -144,32 +180,56 @@ describe('EntityFetcher', () => {
       expect(mockContentClients[1].fetchEntitiesByIds).toHaveBeenCalled()
       expect(mockContentClients[2].fetchEntitiesByIds).toHaveBeenCalled()
     })
+  })
 
-    it('should use correct network based on environment', async () => {
-      const mockContentClient = {
-        fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
-      }
-      ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+  describe('and using different environments', () => {
+    describe('and environment is test', () => {
+      let mockContentClient: any
 
-      const testEntityFetcher = await createEntityFetcher({ fetch, config })
-      await testEntityFetcher.getEntitiesByIds(['test-entity'])
-      expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('sepolia')
+      beforeEach(() => {
+        mockContentClient = {
+          fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
+        }
+        ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+      })
 
-      jest.clearAllMocks()
-      ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
-
-      const prodConfig = createConfigComponent({ PEER_URL, ENV: 'prod' }, {})
-      const prodEntityFetcher = await createEntityFetcher({ fetch, config: prodConfig })
-      await prodEntityFetcher.getEntitiesByIds(['test-entity'])
-      expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('mainnet')
+      it('should use sepolia network', async () => {
+        const testEntityFetcher = await createEntityFetcher({ fetch, config })
+        await testEntityFetcher.getEntitiesByIds(['test-entity'])
+        expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('sepolia')
+      })
     })
 
-    it('should handle empty response from content client', async () => {
-      const mockContentClient = {
+    describe('and environment is prod', () => {
+      let mockContentClient: any
+
+      beforeEach(() => {
+        mockContentClient = {
+          fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
+        }
+        ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+      })
+
+      it('should use mainnet network', async () => {
+        const prodConfig = createConfigComponent({ PEER_URL, ENV: 'prod' }, {})
+        const prodEntityFetcher = await createEntityFetcher({ fetch, config: prodConfig })
+        await prodEntityFetcher.getEntitiesByIds(['test-entity'])
+        expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('mainnet')
+      })
+    })
+  })
+
+  describe('and content client returns empty response', () => {
+    let mockContentClient: any
+
+    beforeEach(() => {
+      mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([])
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
+    })
 
+    it('should handle empty response gracefully', async () => {
       const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'])
 
