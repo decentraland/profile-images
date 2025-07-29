@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # This script is executed when LocalStack is ready.
-# It creates the SQS queues required by the application.
+# It creates the SQS queues and S3 bucket required by the application.
 
-echo "Attempting to create SQS queues for profile-images service..."
+echo "Attempting to create AWS resources for profile-images service..."
 
 # Default AWS credentials and region for LocalStack's awslocal
 export AWS_ACCESS_KEY_ID="test"
@@ -13,6 +13,7 @@ export AWS_DEFAULT_REGION="us-east-1"
 
 QUEUE_NAME="profile-images-queue"
 DLQ_NAME="profile-images-dlq"
+BUCKET_NAME="profile-images-bucket"
 
 # Create main queue
 awslocal sqs create-queue --queue-name ${QUEUE_NAME}
@@ -30,4 +31,12 @@ else
     echo "Failed to create SQS queue: ${DLQ_NAME}" >&2
 fi
 
-echo "SQS queue creation process finished." 
+# Create S3 bucket for storing profile images
+awslocal s3 mb s3://${BUCKET_NAME}
+if [ $? -eq 0 ]; then
+    echo "Successfully created S3 bucket: ${BUCKET_NAME}"
+else
+    echo "Failed to create S3 bucket: ${BUCKET_NAME}" >&2
+fi
+
+echo "AWS resource creation process finished." 
