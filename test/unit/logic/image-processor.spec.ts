@@ -224,4 +224,29 @@ describe('ImageProcessor', () => {
     expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png')
     expect(storage.storeFailure).not.toHaveBeenCalled() // No failure storage in batch mode
   })
+
+  it.each([
+    { entities: null, description: 'null' },
+    { entities: [], description: 'empty array' },
+    { entities: undefined, description: 'undefined' }
+  ])('should handle $description entities gracefully', async ({ entities }) => {
+    const logs = await createLogComponent({ config })
+    const godot = createMockGodot()
+    const storage = createMockStorage()
+    const metrics = createTestMetricsComponent(metricDeclarations)
+
+    const imageProcessor = await createImageProcessor({
+      config,
+      logs,
+      godot,
+      storage,
+      metrics
+    })
+
+    const result = await imageProcessor.processEntities(entities as any)
+    expect(result).toEqual([])
+    expect(godot.generateImages).not.toHaveBeenCalled()
+    expect(storage.storeImages).not.toHaveBeenCalled()
+    expect(storage.storeFailure).not.toHaveBeenCalled()
+  })
 })

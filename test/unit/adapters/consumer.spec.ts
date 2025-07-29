@@ -181,6 +181,46 @@ describe('Consumer test', function () {
       expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
       expect(mainQueueMock.deleteMessage).not.toHaveBeenCalled()
     })
+
+    it('should handle null or empty entities from entity fetcher gracefully', async () => {
+      const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
+
+      // Mock validation to return valid messages
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [{ message, event: JSON.parse(message.Body!) }],
+        invalidMessages: []
+      })
+
+      // Mock entity fetcher to return null/empty entities
+      entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce(null as any)
+
+      await consumer.processMessages(mainQueueMock, [message])
+
+      // Should delete the message since no entities were found
+      expect(entityFetcherMock.getEntitiesByIds).toHaveBeenCalledWith(['1'])
+      expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+      expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+    })
+
+    it('should handle empty array entities from entity fetcher gracefully', async () => {
+      const message = createTestMessage('1', { entity: { id: '1', type: EntityType.PROFILE } })
+
+      // Mock validation to return valid messages
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [{ message, event: JSON.parse(message.Body!) }],
+        invalidMessages: []
+      })
+
+      // Mock entity fetcher to return empty array
+      entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
+
+      await consumer.processMessages(mainQueueMock, [message])
+
+      // Should delete the message since no entities were found
+      expect(entityFetcherMock.getEntitiesByIds).toHaveBeenCalledWith(['1'])
+      expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+      expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+    })
   })
 
   // Helpers

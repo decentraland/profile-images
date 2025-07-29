@@ -66,6 +66,12 @@ export function createConsumerComponent({
 
     const entities = await entityFetcher.getEntitiesByIds(validMessages.map(({ event }) => event.entity.id))
 
+    if (!entities || entities.length === 0) {
+      logger.warn(`No entities found for messages, deleting from ${queueName} queue`)
+      await queue.deleteMessages(validMessages.map(({ message }) => message.ReceiptHandle!))
+      return
+    }
+
     logger.debug(`Got ${entities.length} active entities from ${queueName} queue`)
 
     const results = await imageProcessor.processEntities(entities)
