@@ -1,8 +1,9 @@
-import { createEntityFetcher } from '../../../src/adapters/entity-fetcher'
+import { createEntityFetcher, EntityFetcher } from '../../../src/adapters/entity-fetcher'
 import { Entity, EntityType } from '@dcl/schemas'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import * as catalystClient from 'dcl-catalyst-client'
 import * as contractSnapshots from 'dcl-catalyst-client/dist/contracts-snapshots'
+import { IConfigComponent, IFetchComponent, ILoggerComponent } from '@well-known-components/interfaces'
 
 jest.mock('dcl-catalyst-client')
 jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
@@ -11,15 +12,15 @@ const PEER_URL = 'https://peer.decentraland.org'
 const ENV = 'test'
 
 describe('when fetching entities by IDs', () => {
-  const fetch = {
-    fetch: jest.fn()
-  }
+  let fetch: IFetchComponent
+  let config: IConfigComponent
+  let logs: ILoggerComponent
 
-  const config = createConfigComponent({ PEER_URL, ENV }, {})
+  let entityFetcher: EntityFetcher
 
   let mockEntity: Entity
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockEntity = {
       id: 'test-entity',
       type: EntityType.PROFILE,
@@ -36,6 +37,21 @@ describe('when fetching entities by IDs', () => {
       { address: 'https://peer3.decentraland.org' }
     ]
     ;(contractSnapshots.getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalystServers)
+
+    fetch = {
+      fetch: jest.fn()
+    }
+    config = createConfigComponent({ PEER_URL, ENV }, {})
+    logs = {
+      getLogger: jest.fn().mockReturnValue({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn()
+      })
+    }
+
+    entityFetcher = await createEntityFetcher({ fetch, config, logs })
   })
 
   afterEach(() => {
@@ -53,7 +69,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should fetch entities successfully', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'])
 
       expect(result).toEqual([mockEntity])
@@ -74,7 +89,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should use the custom server URL', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       await entityFetcher.getEntitiesByIds(['test-entity'], {
         contentServerUrl: 'https://custom-peer.decentraland.org'
       })
@@ -103,7 +117,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should retry with different catalyst server', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], { retries: 3 })
 
       expect(result).toEqual([mockEntity])
@@ -127,7 +140,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should respect custom retry settings', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], {
         retries: 3,
         waitTime: 100
@@ -149,8 +161,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should fail after exhausting all retries', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
-
       await expect(entityFetcher.getEntitiesByIds(['test-entity'], { retries: 2 })).rejects.toThrow('Server error')
 
       expect(mockContentClient.fetchEntitiesByIds).toHaveBeenCalledTimes(2)
@@ -172,7 +182,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should rotate through available catalyst servers', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'], { retries: 3 })
 
       expect(result).toEqual([mockEntity])
@@ -194,8 +203,7 @@ describe('when fetching entities by IDs', () => {
       })
 
       it('should use sepolia network', async () => {
-        const testEntityFetcher = await createEntityFetcher({ fetch, config })
-        await testEntityFetcher.getEntitiesByIds(['test-entity'])
+        await entityFetcher.getEntitiesByIds(['test-entity'])
         expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('sepolia')
       })
     })
@@ -212,8 +220,8 @@ describe('when fetching entities by IDs', () => {
 
       it('should use mainnet network', async () => {
         const prodConfig = createConfigComponent({ PEER_URL, ENV: 'prod' }, {})
-        const prodEntityFetcher = await createEntityFetcher({ fetch, config: prodConfig })
-        await prodEntityFetcher.getEntitiesByIds(['test-entity'])
+        const entityFetcherWithProdConfig = await createEntityFetcher({ fetch, config: prodConfig, logs })
+        await entityFetcherWithProdConfig.getEntitiesByIds(['test-entity'])
         expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('mainnet')
       })
     })
@@ -230,7 +238,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     it('should handle empty response gracefully', async () => {
-      const entityFetcher = await createEntityFetcher({ fetch: fetch, config: config })
       const result = await entityFetcher.getEntitiesByIds(['test-entity'])
 
       expect(result).toEqual([])

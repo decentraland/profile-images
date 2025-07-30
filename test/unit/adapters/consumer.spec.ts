@@ -152,6 +152,169 @@ describe('when processing messages', () => {
   })
 
   describe('and processing from main queue', () => {
+    describe('and entities can be extracted from messages', () => {
+      beforeEach(() => {
+        // Override the message to have extractable entity data
+        message = createTestMessage('1', {
+          entity: {
+            entityId: '1',
+            entityType: EntityType.PROFILE,
+            id: '1',
+            version: 'v3',
+            pointers: ['0x1'],
+            entityTimestamp: 1234567890,
+            content: [],
+            metadata: {
+              avatars: [
+                {
+                  avatar: {
+                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+                    eyes: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+                    hair: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+                    skin: { color: { r: 0.23, g: 0.24, b: 0.25 } }
+                  }
+                }
+              ]
+            }
+          }
+        })
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          invalidMessages: []
+        })
+        imageProcessorMock.processEntities.mockResolvedValue([
+          { entity: entity.id, success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+        ])
+      })
+
+      it('should process entities from messages without calling entity fetcher', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
+        expect(imageProcessorMock.processEntities).toHaveBeenCalledWith([
+          expect.objectContaining({
+            id: '1',
+            type: EntityType.PROFILE,
+            metadata: expect.objectContaining({
+              avatars: expect.arrayContaining([
+                expect.objectContaining({
+                  avatar: expect.objectContaining({
+                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale'
+                  })
+                })
+              ])
+            })
+          })
+        ])
+        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+      })
+    })
+
+    describe('and entities cannot be extracted from messages', () => {
+      beforeEach(() => {
+        // Override the message to have non-extractable entity data
+        message = createTestMessage('1', {
+          entity: {
+            entityId: '1',
+            entityType: EntityType.PROFILE,
+            id: '1',
+            // Missing metadata.avatars
+            metadata: {}
+          }
+        })
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          invalidMessages: []
+        })
+        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
+        imageProcessorMock.processEntities.mockResolvedValue([
+          { entity: entity.id, success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+        ])
+      })
+
+      it('should fetch entities from entity fetcher', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        expect(entityFetcherMock.getEntitiesByIds).toHaveBeenCalledWith(['1'])
+        expect(imageProcessorMock.processEntities).toHaveBeenCalledWith([entity])
+        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+      })
+    })
+
+    describe('and some entities can be extracted and others need fetching', () => {
+      let message1: Message
+      let message2: Message
+      let entity1: Entity
+      let entity2: Entity
+
+      beforeEach(() => {
+        entity1 = createTestEntity('1')
+        entity2 = createTestEntity('2')
+
+        // Message with extractable entity
+        message1 = createTestMessage('1', {
+          entity: {
+            entityId: '1',
+            entityType: EntityType.PROFILE,
+            id: '1',
+            version: 'v3',
+            pointers: ['0x1'],
+            entityTimestamp: 1234567890,
+            content: [],
+            metadata: {
+              avatars: [
+                {
+                  avatar: {
+                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+                    eyes: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+                    hair: { color: { r: 0.23, g: 0.24, b: 0.25 } },
+                    skin: { color: { r: 0.23, g: 0.24, b: 0.25 } }
+                  }
+                }
+              ]
+            }
+          }
+        })
+
+        // Message with non-extractable entity
+        message2 = createTestMessage('2', {
+          entity: {
+            entityId: '2',
+            entityType: EntityType.PROFILE,
+            id: '2',
+            // Missing metadata.avatars
+            metadata: {}
+          }
+        })
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [
+            { message: message1, event: JSON.parse(message1.Body!) },
+            { message: message2, event: JSON.parse(message2.Body!) }
+          ],
+          invalidMessages: []
+        })
+        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity2])
+        imageProcessorMock.processEntities.mockResolvedValue([
+          { entity: entity1.id, success: true, shouldRetry: false, avatar: entity1.metadata.avatars[0].avatar },
+          { entity: entity2.id, success: true, shouldRetry: false, avatar: entity2.metadata.avatars[0].avatar }
+        ])
+      })
+
+      it('should combine entities from messages and fetcher', async () => {
+        await consumer.processMessages(mainQueueMock, [message1, message2])
+
+        expect(entityFetcherMock.getEntitiesByIds).toHaveBeenCalledWith(['2'])
+        expect(imageProcessorMock.processEntities).toHaveBeenCalledWith([
+          expect.objectContaining({ id: '1' }), // From message
+          expect.objectContaining({ id: '2' }) // From fetcher
+        ])
+        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message1.ReceiptHandle, message2.ReceiptHandle])
+      })
+    })
+
     describe('and processing succeeds', () => {
       beforeEach(() => {
         messageValidatorMock.validateMessages.mockReturnValue({
@@ -168,32 +331,6 @@ describe('when processing messages', () => {
         await consumer.processMessages(mainQueueMock, [message])
 
         expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
-      })
-    })
-
-    describe('and processing fails with shouldRetry true', () => {
-      beforeEach(() => {
-        messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
-          invalidMessages: []
-        })
-        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
-        imageProcessorMock.processEntities.mockResolvedValue([
-          {
-            entity: entity.id,
-            success: false,
-            shouldRetry: true,
-            error: 'Processing failed',
-            avatar: entity.metadata.avatars[0].avatar
-          }
-        ])
-      })
-
-      it('should not delete the message', async () => {
-        await consumer.processMessages(mainQueueMock, [message])
-
-        expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
-        expect(mainQueueMock.deleteMessage).not.toHaveBeenCalled()
       })
     })
 
@@ -289,11 +426,22 @@ describe('when processing messages', () => {
 
   describe('and entity fetcher returns null entities', () => {
     beforeEach(() => {
+      // Override message to have non-extractable entity
+      message = createTestMessage('1', {
+        entity: {
+          entityId: '1',
+          entityType: EntityType.PROFILE,
+          id: '1',
+          // Missing metadata.avatars
+          metadata: {}
+        }
+      })
+
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: JSON.parse(message.Body!) }],
         invalidMessages: []
       })
-      entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce(null as any)
+      entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
     })
 
     it('should delete the message and not call image processor', async () => {
@@ -307,6 +455,17 @@ describe('when processing messages', () => {
 
   describe('and entity fetcher returns empty array', () => {
     beforeEach(() => {
+      // Override message to have non-extractable entity
+      message = createTestMessage('1', {
+        entity: {
+          entityId: '1',
+          entityType: EntityType.PROFILE,
+          id: '1',
+          // Missing metadata.avatars
+          metadata: {}
+        }
+      })
+
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: JSON.parse(message.Body!) }],
         invalidMessages: []

@@ -30,7 +30,15 @@ export async function createImageProcessor({
       return []
     }
 
-    const avatars: ExtendedAvatar[] = entities.map(({ id, metadata }) => ({
+    // Ensure entities is always an array
+    const entitiesArray = Array.isArray(entities) ? entities : []
+
+    if (entitiesArray.length === 0) {
+      logger.warn('No entities provided to process')
+      return []
+    }
+
+    const avatars: ExtendedAvatar[] = entitiesArray.map(({ id, metadata }) => ({
       entity: id,
       avatar: metadata.avatars[0].avatar
     }))

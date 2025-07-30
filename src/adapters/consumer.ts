@@ -1,5 +1,6 @@
 import { Message, MessageSystemAttributeName } from '@aws-sdk/client-sqs'
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
+import { Entity } from '@dcl/schemas'
 import { AppComponents, QueueWorker } from '../types'
 import { ProcessingResult } from '../logic/image-processor'
 import { getReceiveCount } from '../utils/sqs'
@@ -49,6 +50,28 @@ export function createConsumerComponent({
     return { queue, messages }
   }
 
+  function formatEntityFromMessage(event: any): Entity | null {
+    if (
+      event.entity &&
+      event.entity.metadata &&
+      event.entity.metadata.avatars &&
+      event.entity.metadata.avatars.length > 0 &&
+      event.entity.metadata.avatars[0].avatar
+    ) {
+      return {
+        id: event.entity.entityId,
+        type: event.entity.entityType,
+        version: event.entity.version || 'v3',
+        pointers: event.entity.pointers || [event.entity.entityId],
+        timestamp: event.entity.entityTimestamp || event.entity.localTimestamp || Date.now(),
+        content: event.entity.content || [],
+        metadata: event.entity.metadata
+      }
+    }
+
+    return null
+  }
+
   async function processMessages(queue: QueueComponent, messages: Message[]) {
     const queueName = isDLQ(queue) ? 'dlq' : 'main'
     logger.debug(`Processing: ${messages.length} profiles from queue`)
@@ -64,17 +87,39 @@ export function createConsumerComponent({
       return
     }
 
-    const entities = await entityFetcher.getEntitiesByIds(validMessages.map(({ event }) => event.entity.id))
+    const entitiesFromMessages: Entity[] = []
+    const messagesNeedingFetcher: Array<{ message: Message; event: any }> = []
 
-    if (!entities || entities.length === 0) {
+    for (const { message, event } of validMessages) {
+      const entity = formatEntityFromMessage(event)
+      if (entity) {
+        entitiesFromMessages.push(entity)
+      } else {
+        messagesNeedingFetcher.push({ message, event })
+      }
+    }
+
+    let entitiesFromFetcher: Entity[] = []
+    if (messagesNeedingFetcher.length > 0) {
+      logger.debug(`Fetching ${messagesNeedingFetcher.length} entities from fetcher`)
+      entitiesFromFetcher = await entityFetcher.getEntitiesByIds(
+        messagesNeedingFetcher.map(({ event }) => event.entity.id)
+      )
+    }
+
+    const allEntities = [...entitiesFromMessages, ...entitiesFromFetcher]
+
+    if (allEntities.length === 0) {
       logger.warn(`No entities found for messages, deleting from ${queueName} queue`)
       await queue.deleteMessages(validMessages.map(({ message }) => message.ReceiptHandle!))
       return
     }
 
-    logger.debug(`Got ${entities.length} active entities from ${queueName} queue`)
+    logger.debug(
+      `Got ${allEntities.length} active entities from ${queueName} queue (${entitiesFromMessages.length} from messages, ${entitiesFromFetcher.length} from fetcher)`
+    )
 
-    const results = await imageProcessor.processEntities(entities)
+    const results = await imageProcessor.processEntities(allEntities)
 
     const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
 
