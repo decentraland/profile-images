@@ -21,8 +21,8 @@ describe('when validating messages', () => {
           ReceiptHandle: 'receipt1',
           Body: JSON.stringify({
             entity: {
-              id: 'entity1',
-              type: EntityType.PROFILE
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE
             }
           })
         },
@@ -31,8 +31,8 @@ describe('when validating messages', () => {
           ReceiptHandle: 'receipt2',
           Body: JSON.stringify({
             entity: {
-              id: 'entity2',
-              type: EntityType.PROFILE
+              entityId: 'entity2',
+              entityType: EntityType.PROFILE
             }
           })
         }
@@ -85,8 +85,8 @@ describe('when validating messages', () => {
           ReceiptHandle: 'receipt1',
           Body: JSON.stringify({
             entity: {
-              id: 'entity1',
-              type: 'not_profile'
+              entityId: 'entity1',
+              entityType: 'not_profile'
             }
           })
         }
@@ -107,8 +107,8 @@ describe('when validating messages', () => {
           ReceiptHandle: 'receipt1',
           Body: JSON.stringify({
             entity: {
-              id: 'same_id',
-              type: EntityType.PROFILE
+              entityId: 'same_id',
+              entityType: EntityType.PROFILE
             }
           })
         },
@@ -117,8 +117,8 @@ describe('when validating messages', () => {
           ReceiptHandle: 'receipt2',
           Body: JSON.stringify({
             entity: {
-              id: 'same_id',
-              type: EntityType.PROFILE
+              entityId: 'same_id',
+              entityType: EntityType.PROFILE
             }
           })
         }
