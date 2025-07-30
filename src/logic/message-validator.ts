@@ -47,22 +47,15 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         continue
       }
 
-      let entityId: string
-      let entityType: string
-
-      if (event.entity && typeof event.entity === 'object' && event.entity.entityId) {
-        entityId = event.entity.entityId
-        entityType = event.entity.entityType
-      } else if (event.entity && typeof event.entity === 'string' && event.avatar) {
-        entityId = event.entity
-        entityType = 'profile'
-      } else {
+      if (!event.entity || typeof event.entity !== 'object' || !event.entity.entityId) {
         logger.warn(
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
         )
         invalidMessages.push({ message, error: 'invalid_entity_type' })
         continue
       }
+
+      const { entityId, entityType } = event.entity
 
       if (entityType !== 'profile' && entityType !== EntityType.PROFILE) {
         logger.warn(
@@ -91,9 +84,10 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
           id: entityId,
           type: EntityType.PROFILE,
           version: event.entity?.version || 'v3',
-          pointers: event.entity?.pointers || [entityId],
+          pointers: event.entity?.pointers,
           timestamp: event.entity?.timestamp || event.entity?.entityTimestamp || Date.now(),
-          content: event.entity?.content || []
+          content: event.entity?.content || [],
+          metadata: event.entity?.metadata
         },
         authChain: event.entity?.authChain || []
       }

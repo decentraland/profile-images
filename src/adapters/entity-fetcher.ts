@@ -20,10 +20,8 @@ const L1_TESTNET = 'sepolia'
 
 export async function createEntityFetcher({
   fetch,
-  config,
-  logs
-}: Pick<AppComponents, 'fetch' | 'config' | 'logs'>): Promise<EntityFetcher> {
-  const logger = logs.getLogger('entity-fetcher')
+  config
+}: Pick<AppComponents, 'fetch' | 'config'>): Promise<EntityFetcher> {
   const peerUrl = await config.requireString('PEER_URL')
   const contractNetwork = (await config.getString('ENV')) === 'prod' ? L1_MAINNET : L1_TESTNET
 
@@ -41,7 +39,6 @@ export async function createEntityFetcher({
     return (attempt: number): Promise<T> => {
       if (attempt > 1 && catalystServers.length > 0) {
         const [catalystServerUrl] = catalystServers.splice(attempt % catalystServers.length, 1)
-        logger.info(`Rotating content server to ${catalystServerUrl}`)
         contentClientToUse = getContentClientOrDefault(`${catalystServerUrl}/content`)
       }
 
@@ -55,13 +52,8 @@ export async function createEntityFetcher({
       (contentClientToUse) => contentClientToUse.fetchEntitiesByIds(ids),
       contentServerUrl
     )
-    const result = await retry(executeClientRequest, retries, waitTime)
 
-    if (!result) {
-      logger.warn(`No entities found for ids=${ids}`)
-    }
-
-    return result || []
+    return retry(executeClientRequest, retries, waitTime)
   }
 
   return { getEntitiesByIds }

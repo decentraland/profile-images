@@ -3,7 +3,7 @@ import { Entity, EntityType } from '@dcl/schemas'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import * as catalystClient from 'dcl-catalyst-client'
 import * as contractSnapshots from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { IConfigComponent, IFetchComponent, ILoggerComponent } from '@well-known-components/interfaces'
+import { IConfigComponent, IFetchComponent } from '@well-known-components/interfaces'
 
 jest.mock('dcl-catalyst-client')
 jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
@@ -14,7 +14,6 @@ const ENV = 'test'
 describe('when fetching entities by IDs', () => {
   let fetch: IFetchComponent
   let config: IConfigComponent
-  let logs: ILoggerComponent
 
   let entityFetcher: EntityFetcher
 
@@ -42,16 +41,8 @@ describe('when fetching entities by IDs', () => {
       fetch: jest.fn()
     }
     config = createConfigComponent({ PEER_URL, ENV }, {})
-    logs = {
-      getLogger: jest.fn().mockReturnValue({
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        debug: jest.fn()
-      })
-    }
 
-    entityFetcher = await createEntityFetcher({ fetch, config, logs })
+    entityFetcher = await createEntityFetcher({ fetch, config })
   })
 
   afterEach(() => {
@@ -220,7 +211,7 @@ describe('when fetching entities by IDs', () => {
 
       it('should use mainnet network', async () => {
         const prodConfig = createConfigComponent({ PEER_URL, ENV: 'prod' }, {})
-        const entityFetcherWithProdConfig = await createEntityFetcher({ fetch, config: prodConfig, logs })
+        const entityFetcherWithProdConfig = await createEntityFetcher({ fetch, config: prodConfig })
         await entityFetcherWithProdConfig.getEntitiesByIds(['test-entity'])
         expect(contractSnapshots.getCatalystServersFromCache).toHaveBeenCalledWith('mainnet')
       })

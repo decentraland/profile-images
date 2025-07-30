@@ -50,28 +50,6 @@ export function createConsumerComponent({
     return { queue, messages }
   }
 
-  function formatEntityFromMessage(event: any): Entity | null {
-    if (
-      event.entity &&
-      event.entity.metadata &&
-      event.entity.metadata.avatars &&
-      event.entity.metadata.avatars.length > 0 &&
-      event.entity.metadata.avatars[0].avatar
-    ) {
-      return {
-        id: event.entity.entityId,
-        type: event.entity.entityType,
-        version: event.entity.version || 'v3',
-        pointers: event.entity.pointers || [event.entity.entityId],
-        timestamp: event.entity.entityTimestamp || event.entity.localTimestamp || Date.now(),
-        content: event.entity.content || [],
-        metadata: event.entity.metadata
-      }
-    }
-
-    return null
-  }
-
   async function processMessages(queue: QueueComponent, messages: Message[]) {
     const queueName = isDLQ(queue) ? 'dlq' : 'main'
     logger.debug(`Processing: ${messages.length} profiles from queue`)
@@ -91,8 +69,15 @@ export function createConsumerComponent({
     const messagesNeedingFetcher: Array<{ message: Message; event: any }> = []
 
     for (const { message, event } of validMessages) {
-      const entity = formatEntityFromMessage(event)
-      if (entity) {
+      const { entity } = event
+
+      if (
+        entity &&
+        entity.metadata &&
+        entity.metadata.avatars &&
+        entity.metadata.avatars.length > 0 &&
+        entity.metadata.avatars[0].avatar
+      ) {
         entitiesFromMessages.push(entity)
       } else {
         messagesNeedingFetcher.push({ message, event })

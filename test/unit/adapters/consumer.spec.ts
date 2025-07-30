@@ -3,7 +3,7 @@ import { createConfigComponent } from '@well-known-components/env-config-provide
 import { createLogComponent } from '@well-known-components/logger'
 import { Message } from '@aws-sdk/client-sqs'
 import { ILoggerComponent } from '@well-known-components/interfaces'
-import { Entity, EntityType } from '@dcl/schemas'
+import { Entity, EntityType, Events } from '@dcl/schemas'
 import { QueueWorker } from '../../../src/types'
 import { QueueComponent } from '../../../src/logic/queue'
 import { MessageValidator } from '../../../src/logic/message-validator'
@@ -154,37 +154,15 @@ describe('when processing messages', () => {
   describe('and processing from main queue', () => {
     describe('and entities can be extracted from messages', () => {
       beforeEach(() => {
-        // Override the message to have extractable entity data
-        message = createTestMessage('1', {
-          entity: {
-            entityId: '1',
-            entityType: EntityType.PROFILE,
-            id: '1',
-            version: 'v3',
-            pointers: ['0x1'],
-            entityTimestamp: 1234567890,
-            content: [],
-            metadata: {
-              avatars: [
-                {
-                  avatar: {
-                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
-                    eyes: { color: { r: 0.23, g: 0.24, b: 0.25 } },
-                    hair: { color: { r: 0.23, g: 0.24, b: 0.25 } },
-                    skin: { color: { r: 0.23, g: 0.24, b: 0.25 } }
-                  }
-                }
-              ]
-            }
-          }
-        })
-
+        const completeEntity = createTestEntity('1')
+        const standardizedEvent = createStandardizedEvent('1', completeEntity)
+        
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         imageProcessorMock.processEntities.mockResolvedValue([
-          { entity: entity.id, success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          { entity: '1', success: true, shouldRetry: false, avatar: completeEntity.metadata.avatars[0].avatar }
         ])
       })
 
@@ -213,19 +191,19 @@ describe('when processing messages', () => {
 
     describe('and entities cannot be extracted from messages', () => {
       beforeEach(() => {
-        // Override the message to have non-extractable entity data
-        message = createTestMessage('1', {
-          entity: {
-            entityId: '1',
-            entityType: EntityType.PROFILE,
-            id: '1',
-            // Missing metadata.avatars
-            metadata: {}
-          }
-        })
-
+        const incompleteEntity = {
+          id: '1',
+          type: EntityType.PROFILE,
+          version: 'v3',
+          pointers: ['0x1'],
+          timestamp: 1234567890,
+          content: [],
+          metadata: {} // Missing avatars
+        }
+        const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
+        
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
@@ -254,45 +232,22 @@ describe('when processing messages', () => {
         entity2 = createTestEntity('2')
 
         // Message with extractable entity
-        message1 = createTestMessage('1', {
-          entity: {
-            entityId: '1',
-            entityType: EntityType.PROFILE,
-            id: '1',
-            version: 'v3',
-            pointers: ['0x1'],
-            entityTimestamp: 1234567890,
-            content: [],
-            metadata: {
-              avatars: [
-                {
-                  avatar: {
-                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
-                    eyes: { color: { r: 0.23, g: 0.24, b: 0.25 } },
-                    hair: { color: { r: 0.23, g: 0.24, b: 0.25 } },
-                    skin: { color: { r: 0.23, g: 0.24, b: 0.25 } }
-                  }
-                }
-              ]
-            }
-          }
-        })
+        message1 = createTestMessage('1', { entity: entity1 })
+        const standardizedEvent1 = createStandardizedEvent('1', entity1)
 
         // Message with non-extractable entity
-        message2 = createTestMessage('2', {
-          entity: {
-            entityId: '2',
-            entityType: EntityType.PROFILE,
-            id: '2',
-            // Missing metadata.avatars
-            metadata: {}
-          }
+        message2 = createTestMessage('2', { 
+          entity: { 
+            ...entity2, 
+            metadata: {} // Missing avatars
+          } 
         })
+        const standardizedEvent2 = createStandardizedEvent('2', { ...entity2, metadata: {} })
 
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [
-            { message: message1, event: JSON.parse(message1.Body!) },
-            { message: message2, event: JSON.parse(message2.Body!) }
+            { message: message1, event: standardizedEvent1 },
+            { message: message2, event: standardizedEvent2 }
           ],
           invalidMessages: []
         })
@@ -317,8 +272,9 @@ describe('when processing messages', () => {
 
     describe('and processing succeeds', () => {
       beforeEach(() => {
+        const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
@@ -334,10 +290,38 @@ describe('when processing messages', () => {
       })
     })
 
+    describe('and processing fails with shouldRetry true', () => {
+      beforeEach(() => {
+        const standardizedEvent = createStandardizedEvent('1', entity)
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [{ message, event: standardizedEvent }],
+          invalidMessages: []
+        })
+        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
+        imageProcessorMock.processEntities.mockResolvedValue([
+          {
+            entity: entity.id,
+            success: false,
+            shouldRetry: true,
+            error: 'Processing failed',
+            avatar: entity.metadata.avatars[0].avatar
+          }
+        ])
+      })
+
+      it('should not delete the message', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        expect(mainQueueMock.deleteMessage).not.toHaveBeenCalled()
+      })
+    })
+
     describe('and processing fails with shouldRetry false', () => {
       beforeEach(() => {
+        const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
@@ -363,8 +347,9 @@ describe('when processing messages', () => {
   describe('and processing from DLQ', () => {
     describe('and processing succeeds', () => {
       beforeEach(() => {
+        const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
@@ -382,8 +367,9 @@ describe('when processing messages', () => {
 
     describe('and processing fails', () => {
       beforeEach(() => {
+        const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
-          validMessages: [{ message, event: JSON.parse(message.Body!) }],
+          validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
@@ -426,19 +412,19 @@ describe('when processing messages', () => {
 
   describe('and entity fetcher returns null entities', () => {
     beforeEach(() => {
-      // Override message to have non-extractable entity
-      message = createTestMessage('1', {
-        entity: {
-          entityId: '1',
-          entityType: EntityType.PROFILE,
-          id: '1',
-          // Missing metadata.avatars
-          metadata: {}
-        }
-      })
-
+      const incompleteEntity = {
+        id: '1',
+        type: EntityType.PROFILE,
+        version: 'v3',
+        pointers: ['0x1'],
+        timestamp: 1234567890,
+        content: [],
+        metadata: {} // Missing avatars
+      }
+      const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
+      
       messageValidatorMock.validateMessages.mockReturnValueOnce({
-        validMessages: [{ message, event: JSON.parse(message.Body!) }],
+        validMessages: [{ message, event: standardizedEvent }],
         invalidMessages: []
       })
       entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
@@ -455,19 +441,19 @@ describe('when processing messages', () => {
 
   describe('and entity fetcher returns empty array', () => {
     beforeEach(() => {
-      // Override message to have non-extractable entity
-      message = createTestMessage('1', {
-        entity: {
-          entityId: '1',
-          entityType: EntityType.PROFILE,
-          id: '1',
-          // Missing metadata.avatars
-          metadata: {}
-        }
-      })
-
+      const incompleteEntity = {
+        id: '1',
+        type: EntityType.PROFILE,
+        version: 'v3',
+        pointers: ['0x1'],
+        timestamp: 1234567890,
+        content: [],
+        metadata: {} // Missing avatars
+      }
+      const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
+      
       messageValidatorMock.validateMessages.mockReturnValueOnce({
-        validMessages: [{ message, event: JSON.parse(message.Body!) }],
+        validMessages: [{ message, event: standardizedEvent }],
         invalidMessages: []
       })
       entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
@@ -512,3 +498,12 @@ const createTestEntity = (id: string): Entity => ({
   timestamp: 1234567890,
   content: []
 })
+
+const createStandardizedEvent = (entityId: string, entity: Entity) => ({
+  type: Events.Type.CATALYST_DEPLOYMENT,
+  subType: Events.SubType.CatalystDeployment.PROFILE,
+  key: 'entity',
+  timestamp: 1234567890,
+  entity,
+  authChain: []
+} as any)

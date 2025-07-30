@@ -46,7 +46,7 @@ export async function initComponents(): Promise<AppComponents> {
 
   const sqsClient = await createSQSClient({ awsConfig })
 
-  const entityFetcher = await createEntityFetcher({ fetch, config, logs })
+  const entityFetcher = await createEntityFetcher({ fetch, config })
 
   const imageProcessor = await createImageProcessor({
     config,
