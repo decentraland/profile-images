@@ -218,7 +218,7 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(1)
       expect(result.invalidMessages).toHaveLength(0)
-      
+
       const validMessage = result.validMessages[0]
       expect(validMessage.event.entity.id).toBe('entity1')
       expect(validMessage.event.entity.type).toBe(EntityType.PROFILE)

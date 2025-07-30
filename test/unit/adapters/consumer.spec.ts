@@ -156,7 +156,7 @@ describe('when processing messages', () => {
       beforeEach(() => {
         const completeEntity = createTestEntity('1')
         const standardizedEvent = createStandardizedEvent('1', completeEntity)
-        
+
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
@@ -201,7 +201,7 @@ describe('when processing messages', () => {
           metadata: {} // Missing avatars
         }
         const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
-        
+
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
@@ -236,11 +236,11 @@ describe('when processing messages', () => {
         const standardizedEvent1 = createStandardizedEvent('1', entity1)
 
         // Message with non-extractable entity
-        message2 = createTestMessage('2', { 
-          entity: { 
-            ...entity2, 
+        message2 = createTestMessage('2', {
+          entity: {
+            ...entity2,
             metadata: {} // Missing avatars
-          } 
+          }
         })
         const standardizedEvent2 = createStandardizedEvent('2', { ...entity2, metadata: {} })
 
@@ -422,7 +422,7 @@ describe('when processing messages', () => {
         metadata: {} // Missing avatars
       }
       const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
-      
+
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: standardizedEvent }],
         invalidMessages: []
@@ -451,7 +451,7 @@ describe('when processing messages', () => {
         metadata: {} // Missing avatars
       }
       const standardizedEvent = createStandardizedEvent('1', incompleteEntity)
-      
+
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: standardizedEvent }],
         invalidMessages: []
@@ -499,11 +499,12 @@ const createTestEntity = (id: string): Entity => ({
   content: []
 })
 
-const createStandardizedEvent = (entityId: string, entity: Entity) => ({
-  type: Events.Type.CATALYST_DEPLOYMENT,
-  subType: Events.SubType.CatalystDeployment.PROFILE,
-  key: 'entity',
-  timestamp: 1234567890,
-  entity,
-  authChain: []
-} as any)
+const createStandardizedEvent = (entityId: string, entity: Entity) =>
+  ({
+    type: Events.Type.CATALYST_DEPLOYMENT,
+    subType: Events.SubType.CatalystDeployment.PROFILE,
+    key: 'entity',
+    timestamp: 1234567890,
+    entity,
+    authChain: []
+  }) as any
