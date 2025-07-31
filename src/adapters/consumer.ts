@@ -52,7 +52,7 @@ export function createConsumerComponent({
 
   async function processMessages(queue: QueueComponent, messages: Message[]) {
     const queueName = isDLQ(queue) ? 'dlq' : 'main'
-    logger.debug(`Processing: ${messages.length} profiles from queue`)
+    logger.debug(`Processing: ${messages.length} profiles from ${queueName} queue`)
 
     const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
 
@@ -84,6 +84,8 @@ export function createConsumerComponent({
       }
     }
 
+    logger.debug(`Got ${entitiesFromMessages.length} entities from messages that can be processed`)
+
     let entitiesFromFetcher: Entity[] = []
     if (messagesNeedingFetcher.length > 0) {
       logger.debug(`Fetching ${messagesNeedingFetcher.length} entities from fetcher`)
@@ -106,8 +108,9 @@ export function createConsumerComponent({
 
     const results = await imageProcessor.processEntities(allEntities)
 
-    const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
+    logger.debug(`Processed ${results.length} entities`)
 
+    const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
     const messagesToDelete = []
 
     for (const result of results) {
@@ -126,6 +129,7 @@ export function createConsumerComponent({
     }
 
     if (messagesToDelete.length > 0) {
+      logger.debug(`Deleting ${messagesToDelete.length} messages from ${queueName} queue`)
       await queue.deleteMessages(messagesToDelete)
     }
   }
