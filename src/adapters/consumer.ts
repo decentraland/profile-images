@@ -128,6 +128,7 @@ export function createConsumerComponent({
       }
     }
 
+    // Non deleted messages will be moved to the DLQ by the RedrivePolicy configured in the definition
     if (messagesToDelete.length > 0) {
       logger.debug(`Deleting ${messagesToDelete.length} messages from ${queueName} queue`)
       await queue.deleteMessages(messagesToDelete)
