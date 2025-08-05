@@ -17,8 +17,13 @@ export async function scheduleProcessingHandler(
     throw new InvalidRequestError('Invalid request. Request body is not valid')
   }
 
+  const entityIds = body.map((entity) => entity.entityId)
+  if (entityIds.length > 10) {
+    throw new InvalidRequestError('Too many entities to process. Maximum is 10')
+  }
+
   try {
-    const entities = await entityFetcher.getEntitiesByIds(body.map((entity) => entity.entityId))
+    const entities = await entityFetcher.getEntitiesByIds(entityIds)
     const results = await imageProcessor.processEntities(entities)
 
     for (const result of results) {
