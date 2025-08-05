@@ -64,7 +64,8 @@ export async function initComponents(): Promise<AppComponents> {
   const dlQueueUrl = await config.requireString('DLQ_URL')
   const dlQueue = await createQueueComponent({ sqsClient }, dlQueueUrl)
 
-  const consumer = createConsumerComponent({
+  const consumer = await createConsumerComponent({
+    config,
     logs,
     entityFetcher,
     imageProcessor,

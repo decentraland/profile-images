@@ -18,7 +18,7 @@ const QUEUE_URL = 'main-queue-url'
 const DLQ_URL = 'dlq-url'
 
 describe('when consuming the queue', () => {
-  const config = createConfigComponent({ QUEUE_URL, DLQ_URL }, {})
+  const config = createConfigComponent({ QUEUE_URL, DLQ_URL, MAX_DLQ_RETRIES: '5' }, {})
 
   let logs: ILoggerComponent
   let mainQueueMock: jest.Mocked<QueueComponent>
@@ -38,7 +38,8 @@ describe('when consuming the queue', () => {
 
     logs = await createLogComponent({ config })
 
-    consumer = createConsumerComponent({
+    consumer = await createConsumerComponent({
+      config,
       logs,
       mainQueue: mainQueueMock,
       dlQueue: dlQueueMock,
@@ -91,7 +92,7 @@ describe('when consuming the queue', () => {
 })
 
 describe('when processing messages', () => {
-  const config = createConfigComponent({ QUEUE_URL, DLQ_URL }, {})
+  const config = createConfigComponent({ QUEUE_URL, DLQ_URL, MAX_DLQ_RETRIES: '5' }, {})
 
   let logs: ILoggerComponent
   let mainQueueMock: jest.Mocked<QueueComponent>
@@ -114,7 +115,8 @@ describe('when processing messages', () => {
 
     logs = await createLogComponent({ config })
 
-    consumer = createConsumerComponent({
+    consumer = await createConsumerComponent({
+      config,
       logs,
       mainQueue: mainQueueMock,
       dlQueue: dlQueueMock,
@@ -365,6 +367,153 @@ describe('when processing messages', () => {
       })
     })
 
+    describe('and processing fails with shouldRetry true', () => {
+      beforeEach(() => {
+        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
+        imageProcessorMock.processEntities.mockResolvedValue([
+          {
+            entity: entity.id,
+            success: false,
+            shouldRetry: true,
+            error: 'Processing failed',
+            avatar: entity.metadata.avatars[0].avatar
+          }
+        ])
+      })
+
+      describe('when receive count is below limit', () => {
+        beforeEach(() => {
+          const messageWithLowReceiveCount = {
+            ...message,
+            Attributes: {
+              ApproximateReceiveCount: '3'
+            }
+          }
+          const standardizedEvent = createStandardizedEvent('1', entity)
+
+          messageValidatorMock.validateMessages.mockReturnValue({
+            validMessages: [{ message: messageWithLowReceiveCount, event: standardizedEvent }],
+            invalidMessages: []
+          })
+        })
+
+        it('should not delete the message', async () => {
+          const messageWithLowReceiveCount = {
+            ...message,
+            Attributes: {
+              ApproximateReceiveCount: '3'
+            }
+          }
+
+          await consumer.processMessages(dlQueueMock, [messageWithLowReceiveCount])
+
+          expect(dlQueueMock.deleteMessages).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('when receive count reaches limit', () => {
+        beforeEach(() => {
+          const messageWithMaxReceiveCount = {
+            ...message,
+            Attributes: {
+              ...message.Attributes,
+              ApproximateReceiveCount: '5'
+            }
+          }
+          const standardizedEvent = createStandardizedEvent('1', entity)
+
+          messageValidatorMock.validateMessages.mockReturnValue({
+            validMessages: [{ message: messageWithMaxReceiveCount, event: standardizedEvent }],
+            invalidMessages: []
+          })
+        })
+
+        it('should delete the message', async () => {
+          const messageWithMaxReceiveCount = {
+            ...message,
+            Attributes: {
+              ...message.Attributes,
+              ApproximateReceiveCount: '5'
+            }
+          }
+
+          await consumer.processMessages(dlQueueMock, [messageWithMaxReceiveCount])
+
+          expect(dlQueueMock.deleteMessages).toHaveBeenCalledWith([messageWithMaxReceiveCount.ReceiptHandle])
+        })
+      })
+
+      describe('when receive count exceeds limit', () => {
+        beforeEach(() => {
+          const messageWithHighReceiveCount = {
+            ...message,
+            Attributes: {
+              ApproximateReceiveCount: '7'
+            }
+          }
+          const standardizedEvent = createStandardizedEvent('1', entity)
+
+          messageValidatorMock.validateMessages.mockReturnValue({
+            validMessages: [{ message: messageWithHighReceiveCount, event: standardizedEvent }],
+            invalidMessages: []
+          })
+        })
+
+        it('should delete the message', async () => {
+          const messageWithHighReceiveCount = {
+            ...message,
+            Attributes: {
+              ApproximateReceiveCount: '7'
+            }
+          }
+
+          await consumer.processMessages(dlQueueMock, [messageWithHighReceiveCount])
+
+          expect(dlQueueMock.deleteMessages).toHaveBeenCalledWith([messageWithHighReceiveCount.ReceiptHandle])
+        })
+      })
+    })
+
+    describe('and processing fails with shouldRetry false', () => {
+      beforeEach(() => {
+        const messageWithLowReceiveCount = {
+          ...message,
+          Attributes: {
+            ApproximateReceiveCount: '2'
+          }
+        }
+        const standardizedEvent = createStandardizedEvent('1', entity)
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [{ message: messageWithLowReceiveCount, event: standardizedEvent }],
+          invalidMessages: []
+        })
+        entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
+        imageProcessorMock.processEntities.mockResolvedValue([
+          {
+            entity: entity.id,
+            success: false,
+            shouldRetry: false,
+            error: 'Processing failed',
+            avatar: entity.metadata.avatars[0].avatar
+          }
+        ])
+      })
+
+      it('should delete the message regardless of receive count', async () => {
+        const messageWithLowReceiveCount = {
+          ...message,
+          Attributes: {
+            ApproximateReceiveCount: '2'
+          }
+        }
+
+        await consumer.processMessages(dlQueueMock, [messageWithLowReceiveCount])
+
+        expect(dlQueueMock.deleteMessages).toHaveBeenCalledWith([messageWithLowReceiveCount.ReceiptHandle])
+      })
+    })
+
     describe('and processing fails', () => {
       beforeEach(() => {
         const standardizedEvent = createStandardizedEvent('1', entity)
@@ -388,7 +537,6 @@ describe('when processing messages', () => {
         await consumer.processMessages(dlQueueMock, [message])
 
         expect(dlQueueMock.deleteMessages).not.toHaveBeenCalled()
-        expect(dlQueueMock.deleteMessage).not.toHaveBeenCalled()
       })
     })
   })

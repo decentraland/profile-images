@@ -8,19 +8,21 @@ import { QueueComponent } from '../logic/queue'
 
 export const MESSAGE_SYSTEM_ATTRIBUTE_NAMES: MessageSystemAttributeName[] = ['ApproximateReceiveCount', 'SentTimestamp']
 
-export function createConsumerComponent({
+export async function createConsumerComponent({
   logs,
   entityFetcher,
   imageProcessor,
   messageValidator,
   mainQueue,
-  dlQueue
+  dlQueue,
+  config
 }: Pick<
   AppComponents,
-  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue'
->): QueueWorker {
+  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue' | 'config'
+>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const isDLQ = (queue: QueueComponent) => queue === dlQueue
+  const maxDLQRetries = (await config.getNumber('MAX_DLQ_RETRIES')) || 3
 
   let isRunning = false
   let processLoopPromise: Promise<void> | null = null
@@ -115,7 +117,8 @@ export function createConsumerComponent({
 
     for (const result of results) {
       const message = messageByEntity.get(result.entity)!
-      const shouldDelete = result.success || !result.shouldRetry
+      const shouldDelete =
+        result.success || !result.shouldRetry || (isDLQ(queue) && getReceiveCount(message) >= maxDLQRetries)
 
       if (shouldDelete) {
         messagesToDelete.push(message.ReceiptHandle!)
