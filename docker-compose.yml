@@ -1,15 +1,63 @@
-version: '3.1'
-
 services:
   localstack:
     container_name: localstack
     image: localstack/localstack
     ports:
-      - "0.0.0.0:4566:4566"            # LocalStack Gateway
-      - "0.0.0.0:4510-4559:4510-4559"  # external services port range
+      - '0.0.0.0:4566:4566' # LocalStack Gateway
+      - '0.0.0.0:4510-4559:4510-4559' # external services port range
     environment:
       # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
       - DEBUG=${DEBUG:-0}
+      - SERVICES=sqs,sns,s3
     volumes:
-      - "./localstack:/var/lib/localstack"
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - './localstack:/var/lib/localstack'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - './scripts/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - profile-images-network
+
+  profile-images:
+    container_name: profile-images
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - '3000:3000'
+    environment:
+      - ENV=local
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ENDPOINT=http://localstack:4566
+      - QUEUE_URL=http://localstack:4566/000000000000/profile-images-queue
+      - DLQ_URL=http://localstack:4566/000000000000/profile-images-dlq
+      - S3_BUCKET=profile-images-bucket
+      - AUTH_SECRET=local-test-secret
+      - COMMIT_HASH=test-commit
+      - CURRENT_VERSION=1.0.0
+      - PEER_URL=https://peer.decentraland.org
+    depends_on:
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/status']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - ./output:/app/output
+    networks:
+      - profile-images-network
+
+networks:
+  profile-images-network:
+    driver: bridge

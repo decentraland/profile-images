@@ -1,123 +1,174 @@
-import { Message } from '@aws-sdk/client-sqs'
-import { AppComponents, ExtendedAvatar, QueueWorker } from '../types'
-import { sleep } from '../logic/sleep'
-import { sqsDeleteMessage, sqsReceiveMessage, sqsSendMessage } from '../logic/queue'
+import { Message, MessageSystemAttributeName } from '@aws-sdk/client-sqs'
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
+import { Entity } from '@dcl/schemas'
+import { AppComponents, QueueWorker } from '../types'
+import { ProcessingResult } from '../logic/image-processor'
+import { getReceiveCount } from '../utils/sqs'
+import { QueueComponent } from '../logic/queue'
+
+export const MESSAGE_SYSTEM_ATTRIBUTE_NAMES: MessageSystemAttributeName[] = ['ApproximateReceiveCount', 'SentTimestamp']
 
 export async function createConsumerComponent({
-  config,
   logs,
-  godot,
-  sqsClient,
-  storage,
-  metrics
-}: Pick<AppComponents, 'config' | 'logs' | 'godot' | 'storage' | 'sqsClient' | 'metrics'>): Promise<QueueWorker> {
+  entityFetcher,
+  imageProcessor,
+  messageValidator,
+  mainQueue,
+  dlQueue,
+  config
+}: Pick<
+  AppComponents,
+  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue' | 'config'
+>): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
-  const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
-    config.requireString('QUEUE_NAME'),
-    config.requireString('RETRY_QUEUE_NAME'),
-    config.getString('COMMIT_HASH'),
-    config.getString('CURRENT_VERSION')
-  ])
+  const isDLQ = (queue: QueueComponent) => queue === dlQueue
+  const maxDLQRetries = (await config.getNumber('MAX_DLQ_RETRIES')) || 3
 
+  let isRunning = false
   let processLoopPromise: Promise<void> | null = null
 
-  async function poll() {
-    let queueUrl = mainQueueUrl
-    let messages = await sqsReceiveMessage(sqsClient, queueUrl, { maxNumberOfMessages: 10 })
-    if (messages.length === 0) {
-      queueUrl = retryQueueUrl
-      messages = await sqsReceiveMessage(sqsClient, queueUrl, { maxNumberOfMessages: 1 })
+  async function processLoop() {
+    while (isRunning) {
+      const { queue, messages } = await poll()
+      await processMessages(queue, messages)
     }
-
-    return { queueUrl, messages }
   }
 
-  async function process(queueUrl: string, messages: Message[]) {
-    logger.debug(`Processing: ${messages.length} profiles`)
+  async function poll() {
+    let queue = mainQueue
+    let messages = await mainQueue.receiveMessage({
+      maxNumberOfMessages: 10,
+      messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
+    })
 
-    const messageByEntity = new Map<string, Message>()
-
-    const input: ExtendedAvatar[] = []
-    for (const message of messages) {
-      if (!message.Body) {
-        logger.warn(
-          `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with undefined Body`
-        )
-        await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
-        return
-      }
-      const body: ExtendedAvatar = JSON.parse(message.Body)
-      if (!body.avatar) {
-        logger.warn(
-          `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
-        )
-        await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
-        return
-      }
-
-      if (messageByEntity.has(body.entity)) {
-        // NOTE: we are already processing this entity in the batch
-        await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
-        continue
-      }
-
-      messageByEntity.set(body.entity, message)
-
-      input.push(body)
+    if (messages.length === 0) {
+      queue = dlQueue
+      messages = await dlQueue.receiveMessage({
+        maxNumberOfMessages: 1,
+        messageSystemAttributeNames: MESSAGE_SYSTEM_ATTRIBUTE_NAMES
+      })
     }
 
-    logger.debug(`Processing: ${input[0].entity} entity`)
-    const { avatars: results, output: outputGenerated } = await godot.generateImages(input)
+    return { queue, messages }
+  }
+
+  async function processMessages(queue: QueueComponent, messages: Message[]) {
+    const queueName = isDLQ(queue) ? 'DLQ' : 'main'
+    logger.debug(`Processing: ${messages.length} profiles from ${queueName} queue`)
+
+    const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
+
+    if (invalidMessages.length > 0) {
+      logger.warn(`Deleting ${invalidMessages.length} invalid messages from ${queueName} queue`)
+      await queue.deleteMessages(invalidMessages.map(({ message }) => message.ReceiptHandle!))
+    }
+
+    if (validMessages.length === 0) {
+      return
+    }
+
+    const entitiesFromMessages: Entity[] = []
+    const messagesNeedingFetcher: Array<{ message: Message; event: any }> = []
+
+    for (const { message, event } of validMessages) {
+      const { entity } = event
+
+      if (
+        entity &&
+        entity.metadata &&
+        entity.metadata.avatars &&
+        entity.metadata.avatars.length > 0 &&
+        entity.metadata.avatars[0].avatar
+      ) {
+        entitiesFromMessages.push(entity)
+      } else {
+        messagesNeedingFetcher.push({ message, event })
+      }
+    }
+
+    logger.debug(`Got ${entitiesFromMessages.length} entities from messages that can be processed`)
+
+    let entitiesFromFetcher: Entity[] = []
+    if (messagesNeedingFetcher.length > 0) {
+      logger.debug(`Fetching ${messagesNeedingFetcher.length} entities from fetcher`)
+      entitiesFromFetcher = await entityFetcher.getEntitiesByIds(
+        messagesNeedingFetcher.map(({ event }) => event.entity.id)
+      )
+    }
+
+    const allEntities = [...entitiesFromMessages, ...entitiesFromFetcher]
+
+    if (allEntities.length === 0) {
+      logger.warn(`No entities found for messages, deleting from ${queueName} queue`)
+      await queue.deleteMessages(validMessages.map(({ message }) => message.ReceiptHandle!))
+      return
+    }
+
+    logger.debug(
+      `Got ${allEntities.length} active entities from ${queueName} queue (${entitiesFromMessages.length} from messages, ${entitiesFromFetcher.length} from fetcher)`
+    )
+
+    const results = await imageProcessor.processEntities(allEntities)
+
+    logger.debug(`Processed ${results.length} entities`)
+
+    const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
+    const messagesToDelete = []
 
     for (const result of results) {
       const message = messageByEntity.get(result.entity)!
-      if (result.success) {
-        metrics.increment('snapshot_generation_count', { status: 'success' }, 1)
-        const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
-        if (!success) {
-          logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
-          continue
-        }
-      } else if (messages.length === 1) {
-        metrics.increment('snapshot_generation_count', { status: 'failure' }, 1)
-        logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
-        const failure = {
-          timestamp: new Date().toISOString(),
-          commitHash,
-          version,
-          entity: result.entity,
-          outputGenerated
-        }
-        await storage.storeFailure(result.entity, JSON.stringify(failure))
-      } else {
-        logger.debug(`Godot failure, enqueue for individual retry, entity=${result.entity}`)
-        await sqsSendMessage(sqsClient, retryQueueUrl, { entity: result.entity, avatar: result.avatar })
+      const shouldDelete =
+        result.success || !result.shouldRetry || (isDLQ(queue) && getReceiveCount(message) >= maxDLQRetries)
+
+      if (shouldDelete) {
+        messagesToDelete.push(message.ReceiptHandle!)
       }
 
-      await sqsDeleteMessage(sqsClient, queueUrl, message.ReceiptHandle!)
+      if (result.success) {
+        handleSuccess(message, queue, result)
+      } else {
+        handleFailure(message, queue, result)
+      }
+    }
+
+    // Non deleted messages will be moved to the DLQ by the RedrivePolicy configured in the definition
+    if (messagesToDelete.length > 0) {
+      logger.debug(`Deleting ${messagesToDelete.length} messages from ${queueName} queue`)
+      await queue.deleteMessages(messagesToDelete)
     }
   }
 
-  async function processLoop() {
-    while (true) {
-      try {
-        const { queueUrl, messages } = await poll()
+  function handleSuccess(_message: Message, queue: QueueComponent, result: ProcessingResult) {
+    const queueName = isDLQ(queue) ? 'DLQ' : 'main'
+    logger.info(`Successfully processed message from ${queueName} for entity ${result.entity}`)
+  }
 
-        if (messages.length === 0) {
-          await sleep(20 * 1000)
-          continue
-        }
+  function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {
+    const receiveCount = getReceiveCount(message)
+    const error = result.error || 'Unknown error'
 
-        await process(queueUrl, messages)
-      } catch (error: any) {
-        logger.error(error)
-      }
+    if (isDLQ(queue)) {
+      logger.warn(`Processing failed in DLQ for entity ${result.entity}`, {
+        error,
+        receiveCount,
+        age: Date.now() - parseInt(message.Attributes?.SentTimestamp || '0')
+      })
+    } else if (!result.shouldRetry) {
+      logger.warn(`Not retrying - Deleting from main queue: ${result.entity}`, {
+        error,
+        receiveCount
+      })
+    } else {
+      logger.warn(`Processing failed - Will retry: ${result.entity}`, {
+        error,
+        receiveCount
+      })
     }
   }
 
   async function start() {
     logger.debug('Starting consumer')
+    isRunning = true
 
     // Start the processing loop in the background
     processLoopPromise = processLoop()
@@ -127,7 +178,8 @@ export async function createConsumerComponent({
   }
 
   async function stop() {
-    logger.info('Stopping messages consumer component')
+    logger.debug('Stopping consumer')
+    isRunning = false
 
     if (processLoopPromise) {
       await processLoopPromise
@@ -135,5 +187,5 @@ export async function createConsumerComponent({
     }
   }
 
-  return { [START_COMPONENT]: start, [STOP_COMPONENT]: stop, process, poll }
+  return { [START_COMPONENT]: start, [STOP_COMPONENT]: stop, processMessages, poll }
 }

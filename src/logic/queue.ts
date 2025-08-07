@@ -1,57 +1,101 @@
 import {
+  DeleteMessageBatchCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
   Message,
   ReceiveMessageCommand,
   SendMessageCommand
 } from '@aws-sdk/client-sqs'
-import { ExtendedAvatar } from '../types'
-import { SqsClient } from '../adapters/sqs'
+import { ReceiveMessageOptions } from '../types'
+import { CatalystDeploymentEvent } from '@dcl/schemas'
+import { AppComponents } from '../types'
+import { chunks } from '../utils/array'
 
-export async function sqsSendMessage(client: SqsClient, queueUrl: string, message: ExtendedAvatar) {
-  const sendCommand = new SendMessageCommand({
-    QueueUrl: queueUrl,
-    MessageBody: JSON.stringify(message)
-  })
-  await client.sendMessage(sendCommand)
+export type QueueComponent = {
+  sendMessage(message: CatalystDeploymentEvent): Promise<void>
+  receiveMessage(options: ReceiveMessageOptions): Promise<Message[]>
+  deleteMessage(receiptHandle: string): Promise<void>
+  deleteMessages(receiptHandles: string[]): Promise<void>
+  getStatus(): Promise<{
+    ApproximateNumberOfMessages: string
+    ApproximateNumberOfMessagesNotVisible: string
+    ApproximateNumberOfMessagesDelayed: string
+  }>
 }
 
-export async function sqsReceiveMessage(
-  client: SqsClient,
-  queueUrl: string,
-  options: { maxNumberOfMessages: number; waitTimeSeconds?: number }
-): Promise<Message[]> {
-  const receiveCommand = new ReceiveMessageCommand({
-    QueueUrl: queueUrl,
-    MaxNumberOfMessages: options.maxNumberOfMessages,
-    WaitTimeSeconds: options.waitTimeSeconds
-  })
-  const { Messages = [] } = await client.receiveMessages(receiveCommand)
+export async function createQueueComponent(
+  { sqsClient }: Pick<AppComponents, 'sqsClient'>,
+  queueUrl: string
+): Promise<QueueComponent> {
+  async function sendMessage(message: CatalystDeploymentEvent) {
+    const sendCommand = new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(message)
+    })
+    await sqsClient.sendMessage(sendCommand)
+  }
 
-  return Messages
-}
+  async function receiveMessage(options: ReceiveMessageOptions): Promise<Message[]> {
+    const { maxNumberOfMessages, visibilityTimeout, waitTimeSeconds, messageSystemAttributeNames } = options
 
-export async function sqsDeleteMessage(client: SqsClient, queueUrl: string, receiptHandle: string) {
-  const deleteCommand = new DeleteMessageCommand({
-    QueueUrl: queueUrl,
-    ReceiptHandle: receiptHandle
-  })
-  await client.deleteMessage(deleteCommand)
-}
+    const receiveCommand = new ReceiveMessageCommand({
+      QueueUrl: queueUrl,
+      MaxNumberOfMessages: maxNumberOfMessages,
+      VisibilityTimeout: visibilityTimeout || 60,
+      WaitTimeSeconds: waitTimeSeconds || 20,
+      MessageSystemAttributeNames: messageSystemAttributeNames
+    })
+    const { Messages = [] } = await sqsClient.receiveMessages(receiveCommand)
 
-export async function sqsStatus(client: SqsClient, queueUrl: string): Promise<Record<string, any>> {
-  const command = new GetQueueAttributesCommand({
-    QueueUrl: queueUrl,
-    AttributeNames: [
-      'ApproximateNumberOfMessages',
-      'ApproximateNumberOfMessagesNotVisible',
-      'ApproximateNumberOfMessagesDelayed'
-    ]
-  })
-  const response = await client.getQueueAttributes(command)
+    return Messages
+  }
+
+  async function deleteMessage(receiptHandle: string) {
+    const deleteCommand = new DeleteMessageCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: receiptHandle
+    })
+    await sqsClient.deleteMessage(deleteCommand)
+  }
+
+  async function deleteMessages(receiptHandles: string[]) {
+    const batchSize = 10
+    const batches = chunks(receiptHandles, batchSize)
+
+    for (const batch of batches) {
+      const deleteCommand = new DeleteMessageBatchCommand({
+        QueueUrl: queueUrl,
+        Entries: batch.map((receiptHandle, index) => ({
+          Id: `msg_${index}`,
+          ReceiptHandle: receiptHandle
+        }))
+      })
+      await sqsClient.deleteMessages(deleteCommand)
+    }
+  }
+
+  async function getStatus() {
+    const command = new GetQueueAttributesCommand({
+      QueueUrl: queueUrl,
+      AttributeNames: [
+        'ApproximateNumberOfMessages',
+        'ApproximateNumberOfMessagesNotVisible',
+        'ApproximateNumberOfMessagesDelayed'
+      ]
+    })
+    const response = await sqsClient.getQueueAttributes(command)
+    return {
+      ApproximateNumberOfMessages: response.Attributes?.ApproximateNumberOfMessages ?? '0',
+      ApproximateNumberOfMessagesNotVisible: response.Attributes?.ApproximateNumberOfMessagesNotVisible ?? '0',
+      ApproximateNumberOfMessagesDelayed: response.Attributes?.ApproximateNumberOfMessagesDelayed ?? '0'
+    }
+  }
+
   return {
-    ApproximateNumberOfMessages: response.Attributes?.ApproximateNumberOfMessages,
-    ApproximateNumberOfMessagesNotVisible: response.Attributes?.ApproximateNumberOfMessagesNotVisible,
-    ApproximateNumberOfMessagesDelayed: response.Attributes?.ApproximateNumberOfMessagesDelayed
+    sendMessage,
+    receiveMessage,
+    deleteMessage,
+    deleteMessages,
+    getStatus
   }
 }

@@ -1,30 +1,24 @@
-import { sqsStatus } from '../../logic/queue'
 import { HandlerContextWithPath, StatusResponse } from '../../types'
 import { IHttpServerComponent } from '@well-known-components/interfaces'
 
 export async function statusHandler(
-  context: HandlerContextWithPath<'config' | 'sqsClient', '/status'>
+  context: HandlerContextWithPath<'config' | 'mainQueue' | 'dlQueue', '/status'>
 ): Promise<IHttpServerComponent.IResponse> {
-  const { config, sqsClient } = context.components
+  const { config, mainQueue, dlQueue } = context.components
 
-  const [mainQueueUrl, retryQueueUrl, commitHash, version] = await Promise.all([
-    config.requireString('QUEUE_NAME'),
-    config.requireString('RETRY_QUEUE_NAME'),
+  const [commitHash, version] = await Promise.all([
     config.getString('COMMIT_HASH'),
     config.getString('CURRENT_VERSION')
   ])
 
-  const [queueStatus, retryQueueStatus] = await Promise.all([
-    sqsStatus(sqsClient, mainQueueUrl),
-    sqsStatus(sqsClient, retryQueueUrl)
-  ])
+  const [queueStatus, dlqStatus] = await Promise.all([mainQueue.getStatus(), dlQueue.getStatus()])
 
   const status: StatusResponse = {
     commitHash: commitHash || 'Unknown',
     version: version || 'Unknown',
     queues: {
       queue: queueStatus,
-      retryQueue: retryQueueStatus
+      dlQueue: dlqStatus
     }
   }
 
