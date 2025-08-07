@@ -3,6 +3,9 @@ import { createConfigComponent } from '@well-known-components/env-config-provide
 import { createLogComponent } from '@well-known-components/logger'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../../../src/metrics'
+import type { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import { CompleteMultipartUploadCommandOutput } from '@aws-sdk/client-s3'
+import * as fs from 'fs/promises'
 
 // Mock AWS SDK and fs
 jest.mock('@aws-sdk/client-s3')
@@ -10,22 +13,23 @@ jest.mock('@aws-sdk/lib-storage')
 jest.mock('fs/promises')
 
 describe('when using storage component', () => {
-  const config = createConfigComponent(
-    {
-      BUCKET_NAME: 'test-bucket',
-      S3_IMAGES_PREFIX: 'test-prefix'
-    },
-    {}
-  )
-  const metrics = createTestMetricsComponent(metricDeclarations)
-
-  let logs: any
+  let config: IConfigComponent
+  let metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  let logs: ILoggerComponent
   let storage: IStorageComponent
-  let mockS3Client: any
-  let mockUpload: any
-  let mockFs: any
+  let mockS3Client: { send: jest.Mock }
+  let mockUpload: { done: jest.Mock }
+  let mockFs: jest.Mocked<typeof fs>
 
   beforeEach(async () => {
+    config = createConfigComponent(
+      {
+        BUCKET_NAME: 'test-bucket',
+        S3_IMAGES_PREFIX: 'test-prefix'
+      },
+      {}
+    )
+    metrics = createTestMetricsComponent(metricDeclarations)
     logs = await createLogComponent({ config })
 
     // Mock S3 client
@@ -43,7 +47,7 @@ describe('when using storage component', () => {
     Upload.mockImplementation(() => mockUpload)
 
     // Mock fs
-    mockFs = jest.requireMock('fs/promises')
+    mockFs = jest.mocked(fs)
     mockFs.readFile.mockResolvedValue(Buffer.from('test-image-data'))
     mockFs.rm.mockResolvedValue(undefined)
 
@@ -61,10 +65,10 @@ describe('when using storage component', () => {
 
   describe('and storing images', () => {
     beforeEach(() => {
-      mockUpload.done.mockResolvedValue({})
+      mockUpload.done.mockResolvedValue({} as CompleteMultipartUploadCommandOutput)
     })
 
-    it('should store images successfully', async () => {
+    it('should resolve to true, upload the images and remove the uploaded files images', async () => {
       const result = await storage.storeImages('entity-1', '/tmp/avatar.png', '/tmp/face.png')
 
       expect(result).toBe(true)
@@ -93,7 +97,7 @@ describe('when using storage component', () => {
 
   describe('and storing failure', () => {
     beforeEach(() => {
-      mockUpload.done.mockResolvedValue({})
+      mockUpload.done.mockResolvedValue({} as CompleteMultipartUploadCommandOutput)
     })
 
     it('should store failure successfully', async () => {
@@ -189,7 +193,7 @@ describe('when using storage component', () => {
 
   describe('and storing last checked timestamp', () => {
     beforeEach(() => {
-      mockUpload.done.mockResolvedValue({})
+      mockUpload.done.mockResolvedValue({} as CompleteMultipartUploadCommandOutput)
     })
 
     it('should store timestamp successfully', async () => {
@@ -218,7 +222,7 @@ describe('when using storage component', () => {
         logs
       })
 
-      mockUpload.done.mockResolvedValue({})
+      mockUpload.done.mockResolvedValue({} as CompleteMultipartUploadCommandOutput)
     })
 
     it('should use custom prefix for storing images', async () => {

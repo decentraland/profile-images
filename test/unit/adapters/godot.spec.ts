@@ -2,31 +2,37 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
 import { ExtendedAvatar } from '../../../src/types'
-import { createGodotSnapshotComponent } from '../../../src/adapters/godot'
+import { createGodotSnapshotComponent, GodotComponent } from '../../../src/adapters/godot'
 import { metricDeclarations } from '../../../src/metrics'
 import { exec } from 'child_process'
 import { stat, writeFile, mkdir, rm } from 'fs/promises'
 import { EventEmitter } from 'events'
+import { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
 
 jest.mock('child_process')
 jest.mock('fs/promises')
 
 describe('when generating images with Godot', () => {
-  const config = createConfigComponent(
-    { PEER_URL: 'http://peer', GODOT_BASE_TIMEOUT: '1000', GODOT_AVATAR_TIMEOUT: '1000' },
-    {}
-  )
-  const metrics = createTestMetricsComponent(metricDeclarations)
-
-  let logs: any
-  let godot: any
+  let config: IConfigComponent
+  let metrics: IMetricsComponent<keyof typeof metricDeclarations>
+  let logs: ILoggerComponent
+  let godot: GodotComponent
   let testAvatars: ExtendedAvatar[]
 
+  let mockExec: jest.Mock
+  let mockChildProcess: EventEmitter
+
   beforeEach(async () => {
-    jest.resetAllMocks()
     ;(mkdir as jest.Mock).mockResolvedValue(undefined)
     ;(writeFile as jest.Mock).mockResolvedValue(undefined)
     ;(rm as jest.Mock).mockResolvedValue(undefined)
+
+    config = createConfigComponent(
+      { PEER_URL: 'http://peer', GODOT_BASE_TIMEOUT: '1000', GODOT_AVATAR_TIMEOUT: '1000' },
+      {}
+    )
+
+    metrics = createTestMetricsComponent(metricDeclarations)
 
     logs = await createLogComponent({ config })
     godot = await createGodotSnapshotComponent({ logs, metrics, config })
@@ -36,14 +42,17 @@ describe('when generating images with Godot', () => {
         avatar: {} as any
       }
     ]
+
+    mockExec = exec as unknown as jest.Mock
+    mockChildProcess = new EventEmitter()
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
   })
 
   describe('and process succeeds', () => {
     beforeEach(() => {
-      const mockExec = exec as unknown as jest.Mock
-      const mockChildProcess: any = new EventEmitter()
-      mockChildProcess.pid = 123
-
       mockExec.mockImplementation((...args) => {
         const callback = args.find((arg) => typeof arg === 'function')
         callback(null, 'success', '')
@@ -64,10 +73,6 @@ describe('when generating images with Godot', () => {
 
   describe('and process fails', () => {
     beforeEach(() => {
-      const mockExec = exec as unknown as jest.Mock
-      const mockChildProcess: any = new EventEmitter()
-      mockChildProcess.pid = 123
-
       mockExec.mockImplementation((...args) => {
         const isGodot = args.find((arg) => typeof arg === 'string' && arg.includes('godot'))
         const callback = args.find((arg) => typeof arg === 'function')
@@ -95,10 +100,6 @@ describe('when generating images with Godot', () => {
     let multipleAvatars: ExtendedAvatar[]
 
     beforeEach(() => {
-      const mockExec = exec as unknown as jest.Mock
-      const mockChildProcess: any = new EventEmitter()
-      mockChildProcess.pid = 123
-
       mockExec.mockImplementation((...args) => {
         const callback = args.find((arg) => typeof arg === 'function')
         callback(null, 'success', '')
@@ -129,10 +130,6 @@ describe('when generating images with Godot', () => {
 
   describe('and process times out', () => {
     beforeEach(() => {
-      const mockExec = exec as unknown as jest.Mock
-      const mockChildProcess: any = new EventEmitter()
-      mockChildProcess.pid = 123
-
       mockExec.mockImplementation((...args) => {
         const isGodot = args.find((arg) => typeof arg === 'string' && arg.includes('godot'))
         const callback = args.find((arg) => typeof arg === 'function')

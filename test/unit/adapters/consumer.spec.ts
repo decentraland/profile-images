@@ -173,19 +173,15 @@ describe('when processing messages', () => {
 
         expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
         expect(imageProcessorMock.processEntities).toHaveBeenCalledWith([
-          expect.objectContaining({
+          {
             id: '1',
             type: EntityType.PROFILE,
-            metadata: expect.objectContaining({
-              avatars: expect.arrayContaining([
-                expect.objectContaining({
-                  avatar: expect.objectContaining({
-                    bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale'
-                  })
-                })
-              ])
-            })
-          })
+            metadata: entity.metadata,
+            version: 'v3',
+            pointers: entity.pointers,
+            timestamp: entity.timestamp,
+            content: []
+          }
         ])
         expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
       })
@@ -265,8 +261,8 @@ describe('when processing messages', () => {
 
         expect(entityFetcherMock.getEntitiesByIds).toHaveBeenCalledWith(['2'])
         expect(imageProcessorMock.processEntities).toHaveBeenCalledWith([
-          expect.objectContaining({ id: '1' }), // From message
-          expect.objectContaining({ id: '2' }) // From fetcher
+          expect.objectContaining(entity1), // From message
+          expect.objectContaining(entity2) // From fetcher
         ])
         expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message1.ReceiptHandle, message2.ReceiptHandle])
       })

@@ -8,14 +8,16 @@ describe('when validating messages', () => {
   let logs: ILoggerComponent
   let validator: MessageValidator
 
+  let messages: Message[]
+
   beforeEach(async () => {
     logs = await createLogComponent({})
     validator = createMessageValidator({ logs })
   })
 
   describe('and messages are valid', () => {
-    it('should validate valid messages', () => {
-      const messages: Message[] = [
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1',
@@ -37,7 +39,8 @@ describe('when validating messages', () => {
           })
         }
       ]
-
+    })
+    it('should validate valid messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(2)
       expect(result.invalidMessages).toHaveLength(0)
@@ -45,14 +48,16 @@ describe('when validating messages', () => {
   })
 
   describe('and messages have no body', () => {
-    it('should detect messages without body', () => {
-      const messages: Message[] = [
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1'
         }
       ]
+    })
 
+    it('should detect messages without body', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
@@ -61,15 +66,17 @@ describe('when validating messages', () => {
   })
 
   describe('and messages have invalid JSON', () => {
-    it('should detect invalid JSON', () => {
-      const messages: Message[] = [
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1',
           Body: 'invalid json'
         }
       ]
+    })
 
+    it('should detect invalid JSON', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
@@ -78,23 +85,27 @@ describe('when validating messages', () => {
   })
 
   describe('and messages have invalid entity structure', () => {
-    it('should detect missing entity', () => {
-      const messages: Message[] = [
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1',
           Body: JSON.stringify({})
         }
       ]
+    })
 
+    it('should return an invalid_entity_type error', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
       expect(result.invalidMessages[0].error).toBe('invalid_entity_type')
     })
+  })
 
-    it('should detect entity without entityId', () => {
-      const messages: Message[] = [
+  describe('and messages have entity without entityId', () => {
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1',
@@ -105,15 +116,19 @@ describe('when validating messages', () => {
           })
         }
       ]
+    })
 
+    it('should return an invalid_entity_type error', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
       expect(result.invalidMessages[0].error).toBe('invalid_entity_type')
     })
+  })
 
-    it('should detect entity with string entityId instead of object', () => {
-      const messages: Message[] = [
+  describe('and messages have entity with string entityId instead of object', () => {
+    beforeEach(() => {
+      messages = [
         {
           MessageId: '1',
           ReceiptHandle: 'receipt1',
@@ -123,7 +138,9 @@ describe('when validating messages', () => {
           })
         }
       ]
+    })
 
+    it('should return an invalid_entity_type error', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)

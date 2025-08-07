@@ -4,6 +4,7 @@ import { createConfigComponent } from '@well-known-components/env-config-provide
 import * as catalystClient from 'dcl-catalyst-client'
 import * as contractSnapshots from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { IConfigComponent, IFetchComponent } from '@well-known-components/interfaces'
+import { ContentClient } from 'dcl-catalyst-client'
 
 jest.mock('dcl-catalyst-client')
 jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
@@ -14,9 +15,9 @@ const ENV = 'test'
 describe('when fetching entities by IDs', () => {
   let fetch: IFetchComponent
   let config: IConfigComponent
-
   let entityFetcher: EntityFetcher
 
+  let mockContentClient: jest.Mocked<Pick<ContentClient, 'fetchEntitiesByIds'>>
   let mockEntity: Entity
 
   beforeEach(async () => {
@@ -50,8 +51,6 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and using default content client', () => {
-    let mockContentClient: any
-
     beforeEach(() => {
       mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
@@ -73,7 +72,7 @@ describe('when fetching entities by IDs', () => {
 
   describe('and using custom content server URL', () => {
     beforeEach(() => {
-      const mockContentClient = {
+      mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
       }
       ;(catalystClient.createContentClient as jest.Mock).mockReturnValue(mockContentClient)
@@ -92,8 +91,8 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and first server fails', () => {
-    let mockContentClient1: any
-    let mockContentClient2: any
+    let mockContentClient1: jest.Mocked<Pick<ContentClient, 'fetchEntitiesByIds'>>
+    let mockContentClient2: jest.Mocked<Pick<ContentClient, 'fetchEntitiesByIds'>>
 
     beforeEach(() => {
       mockContentClient1 = {
@@ -117,8 +116,6 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and multiple retries are needed', () => {
-    let mockContentClient: any
-
     beforeEach(() => {
       mockContentClient = {
         fetchEntitiesByIds: jest
@@ -142,8 +139,6 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and all retries are exhausted', () => {
-    let mockContentClient: any
-
     beforeEach(() => {
       mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockRejectedValue(new Error('Server error'))
@@ -159,7 +154,7 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and rotating through multiple servers', () => {
-    let mockContentClients: any[]
+    let mockContentClients: jest.Mocked<Pick<ContentClient, 'fetchEntitiesByIds'>[]>
 
     beforeEach(() => {
       mockContentClients = [
@@ -184,8 +179,6 @@ describe('when fetching entities by IDs', () => {
 
   describe('and using different environments', () => {
     describe('and environment is test', () => {
-      let mockContentClient: any
-
       beforeEach(() => {
         mockContentClient = {
           fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
@@ -200,8 +193,6 @@ describe('when fetching entities by IDs', () => {
     })
 
     describe('and environment is prod', () => {
-      let mockContentClient: any
-
       beforeEach(() => {
         mockContentClient = {
           fetchEntitiesByIds: jest.fn().mockResolvedValue([mockEntity])
@@ -219,8 +210,6 @@ describe('when fetching entities by IDs', () => {
   })
 
   describe('and content client returns empty response', () => {
-    let mockContentClient: any
-
     beforeEach(() => {
       mockContentClient = {
         fetchEntitiesByIds: jest.fn().mockResolvedValue([])
