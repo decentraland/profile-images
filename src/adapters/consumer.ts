@@ -53,7 +53,7 @@ export async function createConsumerComponent({
   }
 
   async function processMessages(queue: QueueComponent, messages: Message[]) {
-    const queueName = isDLQ(queue) ? 'dlq' : 'main'
+    const queueName = isDLQ(queue) ? 'DLQ' : 'main'
     logger.debug(`Processing: ${messages.length} profiles from ${queueName} queue`)
 
     const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
@@ -125,9 +125,9 @@ export async function createConsumerComponent({
       }
 
       if (result.success) {
-        await handleSuccess(message, queue, result)
+        handleSuccess(message, queue, result)
       } else {
-        await handleFailure(message, queue, result)
+        handleFailure(message, queue, result)
       }
     }
 
@@ -138,13 +138,12 @@ export async function createConsumerComponent({
     }
   }
 
-  async function handleSuccess(_message: Message, queue: QueueComponent, result: ProcessingResult) {
-    if (isDLQ(queue)) {
-      logger.info(`Successfully processed message from DLQ for entity ${result.entity}`)
-    }
+  function handleSuccess(_message: Message, queue: QueueComponent, result: ProcessingResult) {
+    const queueName = isDLQ(queue) ? 'DLQ' : 'main'
+    logger.info(`Successfully processed message from ${queueName} for entity ${result.entity}`)
   }
 
-  async function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {
+  function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {
     const receiveCount = getReceiveCount(message)
     const error = result.error || 'Unknown error'
 

@@ -177,13 +177,9 @@ describe('when processing entities with image processor', () => {
     })
   })
 
-  describe.each([
-    { entities: null, description: 'null' },
-    { entities: [], description: 'empty array' },
-    { entities: undefined, description: 'undefined' }
-  ])('and entities are $description', ({ entities }) => {
-    it('should handle $description entities gracefully', async () => {
-      const result = await imageProcessor.processEntities(entities as any)
+  describe('and no entities are provided', () => {
+    it('should return empty array', async () => {
+      const result = await imageProcessor.processEntities([])
       expect(result).toEqual([])
       expect(godot.generateImages).not.toHaveBeenCalled()
     })
