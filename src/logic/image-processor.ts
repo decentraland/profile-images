@@ -30,6 +30,8 @@ export async function createImageProcessor({
       return []
     }
 
+    const deploymentTimestamps = new Map<string, number>(entities.map(({ id, timestamp }) => [id, timestamp]))
+
     const avatars: ExtendedAvatar[] = entities.map(({ id, metadata }) => ({
       entity: id,
       avatar: metadata.avatars[0].avatar
@@ -52,6 +54,12 @@ export async function createImageProcessor({
               error: 'Failed to store images',
               avatar: result.avatar
             }
+          }
+
+          const deploymentTimestamp = deploymentTimestamps.get(result.entity)
+          if (deploymentTimestamp) {
+            const durationInSeconds = (Date.now() - deploymentTimestamp) / 1000
+            metrics.observe('entity_deployment_to_image_generation_duration_seconds', {}, durationInSeconds)
           }
 
           return {

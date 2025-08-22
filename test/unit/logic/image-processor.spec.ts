@@ -57,8 +57,9 @@ describe('when processing entities with image processor', () => {
       storeLastCheckedTimestamp: jest.fn()
     } as jest.Mocked<IStorageComponent>
 
-    // Mock the metrics increment method
+    // Mock the metrics increment and observe methods
     jest.spyOn(metrics, 'increment').mockImplementation(() => {})
+    jest.spyOn(metrics, 'observe').mockImplementation(() => {})
 
     testEntity = createTestEntity('1')
     testEntities = [createTestEntity('1'), createTestEntity('2')]
@@ -117,6 +118,55 @@ describe('when processing entities with image processor', () => {
 
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'success' }, 1)
     })
+
+    it('should observe duration metric for successful processing', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(metrics.observe).toHaveBeenCalledWith(
+        'entity_deployment_to_image_generation_duration_seconds',
+        {},
+        expect.any(Number)
+      )
+    })
+  })
+
+  describe('and processing succeeds with multiple entities', () => {
+    beforeEach(() => {
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntities[0].metadata.avatars[0].avatar
+          },
+          {
+            entity: '2',
+            success: true,
+            avatarPath: 'avatar2.png',
+            facePath: 'face2.png',
+            avatar: testEntities[1].metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should observe duration metric for each successful entity', async () => {
+      await imageProcessor.processEntities(testEntities)
+
+      // Should be called twice (once for each successful entity)
+      expect(metrics.observe).toHaveBeenCalledTimes(2)
+
+      // Each observation should use the actual time difference from deployment to completion
+      expect(metrics.observe).toHaveBeenCalledWith(
+        'entity_deployment_to_image_generation_duration_seconds',
+        {},
+        expect.any(Number)
+      )
+    })
   })
 
   describe('and Godot succeeds but storage fails', () => {
@@ -147,6 +197,12 @@ describe('when processing entities with image processor', () => {
         error: 'Failed to store images',
         avatar: testEntity.metadata.avatars[0].avatar
       })
+    })
+
+    it('should not observe duration metric when storage fails', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(metrics.observe).not.toHaveBeenCalled()
     })
   })
 
@@ -187,6 +243,12 @@ describe('when processing entities with image processor', () => {
       await imageProcessor.processEntities([testEntity])
 
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'failure' }, 1)
+    })
+
+    it('should not observe duration metric when Godot fails', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(metrics.observe).not.toHaveBeenCalled()
     })
   })
 
@@ -232,6 +294,12 @@ describe('when processing entities with image processor', () => {
 
       // Verify failures were not stored (should be retried individually)
       expect(storage.storeFailure).not.toHaveBeenCalled()
+    })
+
+    it('should not observe duration metric when Godot fails', async () => {
+      await imageProcessor.processEntities(testEntities)
+
+      expect(metrics.observe).not.toHaveBeenCalled()
     })
   })
 
@@ -281,6 +349,18 @@ describe('when processing entities with image processor', () => {
 
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'success' }, 1)
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'failure' }, 1)
+    })
+
+    it('should observe duration metric only for successful entities', async () => {
+      await imageProcessor.processEntities(testEntities)
+
+      // Should be called once (only for the successful entity)
+      expect(metrics.observe).toHaveBeenCalledTimes(1)
+      expect(metrics.observe).toHaveBeenCalledWith(
+        'entity_deployment_to_image_generation_duration_seconds',
+        {},
+        expect.any(Number)
+      )
     })
   })
 
@@ -338,6 +418,18 @@ describe('when processing entities with image processor', () => {
         error: 'Failed to store images',
         avatar: testEntities[1].metadata.avatars[0].avatar
       })
+    })
+
+    it('should observe duration metric only for successful storage', async () => {
+      // Mock storage to fail for entity 2
+      storage.storeImages
+        .mockResolvedValueOnce(true) // entity 1 succeeds
+        .mockResolvedValueOnce(false) // entity 2 fails
+
+      await imageProcessor.processEntities(testEntities)
+
+      // Should be called once (only for the entity with successful storage)
+      expect(metrics.observe).toHaveBeenCalledTimes(1)
     })
   })
 })
