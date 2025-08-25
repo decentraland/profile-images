@@ -57,11 +57,11 @@ export async function createImageProcessor({
           }
 
           const deploymentTimestamp = deploymentTimestamps.get(result.entity)
-          logger.info(`Deployment timestamp for entity=${result.entity} is ${deploymentTimestamp}`)
+          logger.debug(`Deployment timestamp for entity=${result.entity} is ${deploymentTimestamp}`)
 
           if (deploymentTimestamp) {
             const durationInSeconds = (Date.now() - deploymentTimestamp) / 1000
-            logger.info(`Total duration in seconds for entity=${result.entity} is ${durationInSeconds}`)
+            logger.debug(`Total duration in seconds for entity=${result.entity} is ${durationInSeconds}`)
             metrics.observe('entity_deployment_to_image_generation_duration_seconds', {}, durationInSeconds)
           }
 
