@@ -1,6 +1,6 @@
 import { Message, MessageSystemAttributeName } from '@aws-sdk/client-sqs'
 import { START_COMPONENT, STOP_COMPONENT } from '@well-known-components/interfaces'
-import { Entity } from '@dcl/schemas'
+import { CatalystDeploymentEvent, Entity } from '@dcl/schemas'
 import { AppComponents, QueueWorker } from '../types'
 import { ProcessingResult } from '../logic/image-processor'
 import { getReceiveCount } from '../utils/sqs'
@@ -15,10 +15,11 @@ export async function createConsumerComponent({
   messageValidator,
   mainQueue,
   dlQueue,
-  config
+  config,
+  metrics
 }: Pick<
   AppComponents,
-  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue' | 'config'
+  'logs' | 'entityFetcher' | 'imageProcessor' | 'messageValidator' | 'mainQueue' | 'dlQueue' | 'config' | 'metrics'
 >): Promise<QueueWorker> {
   const logger = logs.getLogger('consumer')
   const isDLQ = (queue: QueueComponent) => queue === dlQueue
@@ -112,11 +113,11 @@ export async function createConsumerComponent({
 
     logger.debug(`Processed ${results.length} entities`)
 
-    const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, message]))
+    const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, { message, event }]))
     const messagesToDelete = []
 
     for (const result of results) {
-      const message = messageByEntity.get(result.entity)!
+      const { message, event } = messageByEntity.get(result.entity)!
       const shouldDelete =
         result.success || !result.shouldRetry || (isDLQ(queue) && getReceiveCount(message) >= maxDLQRetries)
 
@@ -125,7 +126,7 @@ export async function createConsumerComponent({
       }
 
       if (result.success) {
-        handleSuccess(message, queue, result)
+        handleSuccess(event, queue, result)
       } else {
         handleFailure(message, queue, result)
       }
@@ -138,9 +139,15 @@ export async function createConsumerComponent({
     }
   }
 
-  function handleSuccess(_message: Message, queue: QueueComponent, result: ProcessingResult) {
+  function handleSuccess(event: CatalystDeploymentEvent, queue: QueueComponent, result: ProcessingResult) {
     const queueName = isDLQ(queue) ? 'DLQ' : 'main'
     logger.info(`Successfully processed message from ${queueName} for entity ${result.entity}`)
+
+    const durationInSeconds = (Date.now() - event.timestamp) / 1000
+    if (durationInSeconds > 0) {
+      metrics.observe('sqs_message_publication_to_image_generation_duration_seconds', {}, durationInSeconds)
+      logger.debug(`SQS message publication to image generation duration: ${durationInSeconds}s`)
+    }
   }
 
   function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {

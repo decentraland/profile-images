@@ -38,7 +38,7 @@ describe('when processing entities with image processor', () => {
     },
     version: 'v3',
     pointers: ['0x123'],
-    timestamp: 1234567890,
+    timestamp: Date.now() - 30000, // 30 seconds ago to ensure positive duration
     content: []
   })
 
@@ -119,14 +119,29 @@ describe('when processing entities with image processor', () => {
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'success' }, 1)
     })
 
-    it('should observe duration metric for successful processing', async () => {
-      await imageProcessor.processEntities([testEntity])
+    describe('and the duration between entity deployment and image generation is positive', () => {
+      it('should observe duration metric for successful processing', async () => {
+        await imageProcessor.processEntities([testEntity])
 
-      expect(metrics.observe).toHaveBeenCalledWith(
-        'entity_deployment_to_image_generation_duration_seconds',
-        {},
-        expect.any(Number)
-      )
+        expect(metrics.observe).toHaveBeenCalledWith(
+          'entity_deployment_to_image_generation_duration_seconds',
+          {},
+          expect.any(Number)
+        )
+      })
+    })
+
+    describe('and the duration between entity deployment and image generation is negative', () => {
+      it('should not observe duration metric', async () => {
+        const futureEntity = { ...testEntity, timestamp: Date.now() + 60000 }
+        await imageProcessor.processEntities([futureEntity])
+
+        expect(metrics.observe).not.toHaveBeenCalledWith(
+          'entity_deployment_to_image_generation_duration_seconds',
+          {},
+          expect.any(Number)
+        )
+      })
     })
   })
 
