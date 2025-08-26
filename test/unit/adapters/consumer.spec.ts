@@ -1,9 +1,10 @@
 import { createConsumerComponent, MESSAGE_SYSTEM_ATTRIBUTE_NAMES } from '../../../src/adapters/consumer'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
+import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { Message } from '@aws-sdk/client-sqs'
-import { ILoggerComponent } from '@well-known-components/interfaces'
-import { Entity, EntityType, Events } from '@dcl/schemas'
+import { ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import { CatalystDeploymentEvent, Entity, EntityType, Events } from '@dcl/schemas'
 import { QueueWorker } from '../../../src/types'
 import { QueueComponent } from '../../../src/logic/queue'
 import { MessageValidator } from '../../../src/logic/message-validator'
@@ -13,6 +14,7 @@ import { createQueueMock } from '../../mocks/queue-mock'
 import { createMessageValidatorMock } from '../../mocks/message-validator-mock'
 import { createEntityFetcherMock } from '../../mocks/entity-fetcher-mock'
 import { createImageProcessorMock } from '../../mocks/image-processor-mock'
+import { metricDeclarations } from '../../../src/metrics'
 
 const QUEUE_URL = 'main-queue-url'
 const DLQ_URL = 'dlq-url'
@@ -21,6 +23,7 @@ describe('when consuming the queue', () => {
   const config = createConfigComponent({ QUEUE_URL, DLQ_URL, MAX_DLQ_RETRIES: '5' }, {})
 
   let logs: ILoggerComponent
+  let metrics: IMetricsComponent<keyof typeof metricDeclarations>
   let mainQueueMock: jest.Mocked<QueueComponent>
   let dlQueueMock: jest.Mocked<QueueComponent>
   let messageValidatorMock: jest.Mocked<MessageValidator>
@@ -35,6 +38,7 @@ describe('when consuming the queue', () => {
     messageValidatorMock = createMessageValidatorMock()
     entityFetcherMock = createEntityFetcherMock()
     imageProcessorMock = createImageProcessorMock()
+    metrics = createTestMetricsComponent(metricDeclarations)
 
     logs = await createLogComponent({ config })
 
@@ -45,7 +49,8 @@ describe('when consuming the queue', () => {
       dlQueue: dlQueueMock,
       messageValidator: messageValidatorMock,
       entityFetcher: entityFetcherMock,
-      imageProcessor: imageProcessorMock
+      imageProcessor: imageProcessorMock,
+      metrics
     })
   })
 
@@ -95,6 +100,7 @@ describe('when processing messages', () => {
   const config = createConfigComponent({ QUEUE_URL, DLQ_URL, MAX_DLQ_RETRIES: '5' }, {})
 
   let logs: ILoggerComponent
+  let metrics: IMetricsComponent<keyof typeof metricDeclarations>
   let mainQueueMock: jest.Mocked<QueueComponent>
   let dlQueueMock: jest.Mocked<QueueComponent>
   let messageValidatorMock: jest.Mocked<MessageValidator>
@@ -112,6 +118,7 @@ describe('when processing messages', () => {
     messageValidatorMock = createMessageValidatorMock()
     entityFetcherMock = createEntityFetcherMock()
     imageProcessorMock = createImageProcessorMock()
+    metrics = createTestMetricsComponent(metricDeclarations)
 
     logs = await createLogComponent({ config })
 
@@ -122,7 +129,8 @@ describe('when processing messages', () => {
       dlQueue: dlQueueMock,
       messageValidator: messageValidatorMock,
       entityFetcher: entityFetcherMock,
-      imageProcessor: imageProcessorMock
+      imageProcessor: imageProcessorMock,
+      metrics
     })
 
     entity = createTestEntity('1')
@@ -269,8 +277,11 @@ describe('when processing messages', () => {
     })
 
     describe('and processing succeeds', () => {
+      let mockObserve: jest.SpyInstance
+      let standardizedEvent: CatalystDeploymentEvent
+
       beforeEach(() => {
-        const standardizedEvent = createStandardizedEvent('1', entity)
+        standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
           invalidMessages: []
@@ -279,12 +290,41 @@ describe('when processing messages', () => {
         imageProcessorMock.processEntities.mockResolvedValue([
           { entity: entity.id, success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
         ])
+        mockObserve = jest.spyOn(metrics, 'observe').mockImplementation(() => {})
       })
 
-      it('should delete the message', async () => {
-        await consumer.processMessages(mainQueueMock, [message])
+      describe('and the duration between message publication and image generation is greater than 0', () => {
+        it('should delete the message and record the duration metric', async () => {
+          await consumer.processMessages(mainQueueMock, [message])
 
-        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+          expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+          expect(mockObserve).toHaveBeenCalledWith(
+            'sqs_message_publication_to_image_generation_duration_seconds',
+            {},
+            expect.any(Number)
+          )
+        })
+      })
+
+      describe('and the duration between message publication and image generation is lower than 0', () => {
+        beforeEach(() => {
+          const standardizedEvent = createStandardizedEvent('1', entity)
+          messageValidatorMock.validateMessages.mockReturnValue({
+            validMessages: [{ message, event: { ...standardizedEvent, timestamp: Date.now() + 60000 } }],
+            invalidMessages: []
+          })
+        })
+
+        it('should delete the message and not record the duration metric', async () => {
+          await consumer.processMessages(mainQueueMock, [message])
+
+          expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+          expect(mockObserve).not.toHaveBeenCalledWith(
+            'sqs_message_publication_to_image_generation_duration_seconds',
+            {},
+            expect.any(Number)
+          )
+        })
       })
     })
 

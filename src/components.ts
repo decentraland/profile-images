@@ -71,7 +71,8 @@ export async function initComponents(): Promise<AppComponents> {
     imageProcessor,
     messageValidator,
     mainQueue,
-    dlQueue
+    dlQueue,
+    metrics
   })
 
   return {

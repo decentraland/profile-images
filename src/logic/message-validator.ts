@@ -79,13 +79,13 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         type: Events.Type.CATALYST_DEPLOYMENT,
         subType: Events.SubType.CatalystDeployment.PROFILE,
         key: 'entity',
-        timestamp: event.timestamp || Date.now(),
+        timestamp: event.timestamp,
         entity: {
           id: entityId,
           type: EntityType.PROFILE,
           version: event.entity?.version || 'v3',
           pointers: event.entity?.pointers,
-          timestamp: event.entity?.timestamp || event.entity?.entityTimestamp || Date.now(),
+          timestamp: event.entity?.timestamp || event.entity?.entityTimestamp,
           content: event.entity?.content || [],
           metadata: event.entity?.metadata
         },

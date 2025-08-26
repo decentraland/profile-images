@@ -25,6 +25,11 @@ export const metricDeclarations = {
     help: 'Histogram of duration from entity deployment to image generation completion',
     type: IMetricsComponent.HistogramType,
     buckets: [0.1, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200]
+  },
+  sqs_message_publication_to_image_generation_duration_seconds: {
+    help: 'Histogram of duration from SQS message publication to image generation completion',
+    type: IMetricsComponent.HistogramType,
+    buckets: [0.1, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200]
   }
 }
 
