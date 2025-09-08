@@ -1401,10 +1401,20 @@
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^16.8.0", "@dcl/schemas@^16.9.0":
+"@dcl/schemas@^16.9.0":
   version "16.13.0"
   resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.13.0.tgz#c44259271b5e7d45110e893f2f114ce0fd1b67fc"
   integrity sha512-Wcu2tHomUX83bsv6HSbnGKKWypkZUVGGjgtB7MImJbdzccB2FgKzvi47fLADgLjZave4lymFIm/oldWTgtEtzA==
+  dependencies:
+    ajv "^8.11.0"
+    ajv-errors "^3.0.0"
+    ajv-keywords "^5.1.0"
+    mitt "^3.0.1"
+
+"@dcl/schemas@^18.3.0":
+  version "18.3.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-18.3.0.tgz#9016edcaa3eb64d71e1ecca6792cf9a98bb4013d"
+  integrity sha512-6vpQv5nhKjJtcSEsuygyeW/CSe33wVHd5Uij6TFYdSV6Mpjdu2oe/qAkAMkNx1reiK5lXAY8K7Zy3/AB6wBmyQ==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
