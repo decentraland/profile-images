@@ -30,7 +30,7 @@
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@dcl/eslint-config": "^2.2.1",
+    "@dcl/eslint-config": "^2.3.0",
     "@types/node-fetch": "^2.6.11",
     "@well-known-components/test-helpers": "^1.5.8",
     "typescript": "^5.4.5"
