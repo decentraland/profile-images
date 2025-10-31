@@ -1,5 +1,7 @@
 import { SqsClient } from '../../src/adapters/sqs'
 import {
+  DeleteMessageBatchCommand,
+  DeleteMessageBatchCommandOutput,
   DeleteMessageCommand,
   DeleteMessageCommandOutput,
   GetQueueAttributesCommand,
@@ -60,5 +62,13 @@ export function createInMemorySqs(): SqsClient {
     })
   }
 
-  return { sendMessage, getQueueAttributes, receiveMessages, deleteMessage }
+  function deleteMessages(_payload: DeleteMessageBatchCommand): Promise<DeleteMessageBatchCommandOutput> {
+    return Promise.resolve({
+      Successful: [],
+      Failed: [],
+      $metadata: {}
+    })
+  }
+
+  return { sendMessage, getQueueAttributes, receiveMessages, deleteMessage, deleteMessages }
 }

@@ -8,11 +8,12 @@ import { QueueWorker, TestComponents } from '../src/types'
 import { initComponents as originalInitComponents } from '../src/components'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { metricDeclarations } from '../src/metrics'
-import { Producer } from '../src/adapters/producer'
 import { IStorageComponent } from '../src/adapters/storage'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { SqsClient } from '../src/adapters/sqs'
 import { createInMemorySqs } from './mocks/sqs-mock'
+import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
+import { createQueueComponent } from '../src/logic/queue'
 
 /**
  * Behaves like Jest "describe" function, used to describe a test for a
@@ -29,7 +30,9 @@ export const test = createRunner<TestComponents>({
 async function initComponents(): Promise<TestComponents> {
   const components = await originalInitComponents()
 
-  const { config } = components
+  const config = await createDotEnvConfigComponent({
+    path: ['.env.default', '.env', '.env.test']
+  })
 
   const metrics = createTestMetricsComponent(metricDeclarations)
 
@@ -60,14 +63,15 @@ async function initComponents(): Promise<TestComponents> {
   // }
   const sqsClient: SqsClient = createInMemorySqs()
 
+  const mainQueueUrl = await config.requireString('QUEUE_URL')
+  const mainQueue = await createQueueComponent({ sqsClient }, mainQueueUrl)
+
+  const dlQueueUrl = await config.requireString('DLQ_URL')
+  const dlQueue = await createQueueComponent({ sqsClient }, dlQueueUrl)
+
   const consumer: QueueWorker = {
     poll: jest.fn(),
-    process: jest.fn()
-  }
-
-  const producer: Producer = {
-    changeLastRun: jest.fn(),
-    poll: jest.fn()
+    processMessages: jest.fn()
   }
 
   return {
@@ -76,8 +80,9 @@ async function initComponents(): Promise<TestComponents> {
     consumer,
     fetch,
     metrics,
-    producer,
     sqsClient,
+    mainQueue,
+    dlQueue,
     storage
   }
 }

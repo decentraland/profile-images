@@ -13,7 +13,7 @@ export async function createInMemoryStorage({
   const prefix = (await config.getString('S3_IMAGES_PREFIX')) || ''
 
   async function store(key: string, content: Buffer, _contentType: string): Promise<void> {
-    storage.set(key, content)
+    storage.set(key, new Uint8Array(content.buffer))
   }
 
   async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
