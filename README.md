@@ -67,3 +67,7 @@ Generating entities:
 http https://peer.decentraland.org/content/deployments | jq '.deployments[] | select(.entityType == "profile") | .entityId' | cut -d\" -f2  | sort | uniq > entities
 cat entities | bin/compare.sh
 ```
+
+## AI Agent Context
+
+For detailed AI Agent context, see [docs/ai-agent-context.md](docs/ai-agent-context.md).
