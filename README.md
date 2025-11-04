@@ -68,7 +68,7 @@ http https://peer.decentraland.org/content/deployments | jq '.deployments[] | se
 cat entities | bin/compare.sh
 ```
 
-## 🤖 AI Agent Context
+## AI Agent Context
 
 **Service Purpose:** Generates 2D profile images (body and face) from 3D avatar models. Uses a producer-consumer pattern to monitor profile changes and render avatar images for display in applications, social features, and user interfaces.
 
