@@ -3368,10 +3368,10 @@ cross-spawn@^7.0.2, cross-spawn@^7.0.3:
     shebang-command "^2.0.0"
     which "^2.0.1"
 
-dcl-catalyst-client@^21.8.0:
-  version "21.8.1"
-  resolved "https://registry.yarnpkg.com/dcl-catalyst-client/-/dcl-catalyst-client-21.8.1.tgz#e70f2221c9e7045e338c8eff7bca631fe96d58e5"
-  integrity sha512-VtYSBDmiHOFdAl3qzi2CtEUJ8VlJqQ6uTZXYTZ6pCgT/lQnxYkdB0VCVfSfqNo9OD+S7dYeayQ2n+Uap32K0AA==
+dcl-catalyst-client@^21.9.0:
+  version "21.9.0"
+  resolved "https://registry.yarnpkg.com/dcl-catalyst-client/-/dcl-catalyst-client-21.9.0.tgz#239660a70e8470f06aa4b3d4fa2702e6679977b2"
+  integrity sha512-b6EZ0XtJ8lHZ6BnYv9xCqjgKIcz6Y2EZwHh93WRgNY36eGYHGNchaVF85K1nijsGnGWQ2+uI9cKICd0bbE4TUg==
   dependencies:
     "@dcl/catalyst-contracts" "^4.4.0"
     "@dcl/crypto" "^3.4.0"
