@@ -9,7 +9,7 @@ This server interacts with Catalyst for profile entity monitoring, AWS SQS for r
 ## Table of Contents
 
 - [Features](#features)
-- [Dependencies & Related Services](#dependencies--related-services)
+- [Dependencies](#dependencies)
 - [API Documentation](#api-documentation)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -17,8 +17,6 @@ This server interacts with Catalyst for profile entity monitoring, AWS SQS for r
   - [Configuration](#configuration)
   - [Running the Service](#running-the-service)
 - [Testing](#testing)
-- [How to Contribute](#how-to-contribute)
-- [License](#license)
 
 ## Features
 
@@ -29,14 +27,9 @@ This server interacts with Catalyst for profile entity monitoring, AWS SQS for r
 - **CDN Integration**: Stores generated images in S3 for CDN distribution
 - **REST API**: Exposes API endpoints for retrieving generated profile images
 
-## Dependencies & Related Services
-
-This service interacts with the following services:
+## Dependencies
 
 - **[Catalyst](https://github.com/decentraland/catalyst)**: Content server for profile entity fetching and pointer changes monitoring
-
-External dependencies:
-
 - **AWS SQS**: Message queue for rendering jobs and retry queue
 - **AWS S3**: Object storage for generated profile images
 - **LocalStack** (for local development): Local AWS services emulation
@@ -51,11 +44,9 @@ The service provides REST API endpoints for retrieving generated profile images.
 
 Before running this service, ensure you have the following installed:
 
-- **Node.js**: Version 16.x or higher (LTS recommended)
+- **Node.js**: Version 20.x or higher (LTS recommended)
 - **Yarn**: Version 1.22.x or higher
 - **Docker**: For containerized deployment and local development dependencies
-- **LocalStack CLI** (for local development): Install with `brew install localstack/tap/localstack-cli` on macOS
-- **awslocal CLI** (for local development): Install with `pip3 install awscli --upgrade --user` on macOS
 
 ### Installation
 
@@ -80,16 +71,13 @@ yarn build
 
 ### Configuration
 
-The service uses environment variables for configuration. Create a `.env` file in the root directory containing the environment variables for the service to run.
+The service uses environment variables for configuration. Copy the example file and adjust as needed:
 
-Key configuration variables include:
+```bash
+cp .env.default .env
+```
 
-- `QUEUE_URL`: SQS queue URL for rendering jobs
-- `DLQ_URL`: SQS dead letter queue URL for failed jobs
-- `S3_BUCKET`: S3 bucket name for storing images
-- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: AWS credentials
-- `AWS_ENDPOINT`: AWS endpoint (use LocalStack endpoint for local development)
-- `PEER_URL`: Catalyst peer URL for profile entity fetching
+See `.env.default` for available configuration options.
 
 ### Running the Service
 
@@ -104,39 +92,8 @@ docker-compose up -d
 ```
 
 This will start:
+
 - LocalStack (SQS and S3 emulation) on port `4566`
-
-#### Manual LocalStack Setup (Alternative)
-
-If you prefer to run LocalStack manually:
-
-1. Set environment variables:
-
-```bash
-export AWS_ACCESS_KEY_ID="test"
-export AWS_SECRET_ACCESS_KEY="test"
-export AWS_DEFAULT_REGION="us-east-1"
-export AWS_ENDPOINT="http://localhost:4566"
-```
-
-2. Start LocalStack:
-
-```bash
-localstack start
-```
-
-3. Create SQS queues:
-
-```bash
-awslocal sqs create-queue --queue-name profile-images-queue
-awslocal sqs create-queue --queue-name profile-images-dlq
-```
-
-4. Create S3 bucket:
-
-```bash
-awslocal s3api create-bucket --bucket profile-images-bucket
-```
 
 #### Running in development mode
 
@@ -147,6 +104,7 @@ yarn start
 ```
 
 The service will:
+
 - Poll Catalyst for profile changes
 - Process rendering jobs from SQS
 - Generate profile images
@@ -168,6 +126,18 @@ Run tests with coverage:
 
 ```bash
 yarn test:coverage
+```
+
+Run only unit tests:
+
+```bash
+yarn test test/unit
+```
+
+Run only integration tests:
+
+```bash
+yarn test test/integration
 ```
 
 ### Test Structure
