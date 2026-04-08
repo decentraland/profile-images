@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import { DeleteObjectsCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
+import { AvatarInfo } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
 export type IStorageComponent = {
@@ -9,6 +10,9 @@ export type IStorageComponent = {
   deleteFailures(entities: string[]): Promise<void>
   retrieveLastCheckedTimestamp(): Promise<undefined | number>
   storeLastCheckedTimestamp(ts: number): Promise<void>
+  retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined>
+  storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void>
+  deleteAvatarInfo(entity: string): Promise<void>
 }
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
@@ -96,11 +100,61 @@ export async function createStorageComponent({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
+  async function retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined> {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: `${prefix}/entities/${entity}/avatar.json`
+    })
+    try {
+      const output = await s3.send(command)
+      if (!output.Body) {
+        return undefined
+      }
+      const content = Buffer.from(await output.Body.transformToByteArray()).toString()
+      return JSON.parse(content) as AvatarInfo
+    } catch (e: any) {
+      if (e.name === 'NoSuchKey') {
+        return undefined
+      }
+      logger.warn(`Error retrieving avatar info for entity=${entity}, falling back to re-render: ${e.message}`)
+      return undefined
+    }
+  }
+
+  async function storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void> {
+    try {
+      await store(
+        `${prefix}/entities/${entity}/avatar.json`,
+        Buffer.from(JSON.stringify(avatarInfo)),
+        'application/json'
+      )
+    } catch (e: any) {
+      logger.warn(`Error storing avatar info for entity=${entity}: ${e.message}`)
+    }
+  }
+
+  async function deleteAvatarInfo(entity: string): Promise<void> {
+    try {
+      const command = new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: [{ Key: `${prefix}/entities/${entity}/avatar.json` }]
+        }
+      })
+      await s3.send(command)
+    } catch (e: any) {
+      logger.warn(`Error deleting avatar info for entity=${entity}: ${e.message}`)
+    }
+  }
+
   return {
     storeImages,
     storeFailure,
     deleteFailures,
     retrieveLastCheckedTimestamp,
-    storeLastCheckedTimestamp
+    storeLastCheckedTimestamp,
+    retrieveAvatarInfo,
+    storeAvatarInfo,
+    deleteAvatarInfo
   }
 }
