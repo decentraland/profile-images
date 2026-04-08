@@ -231,4 +231,126 @@ describe('when using storage component', () => {
       expect(mockUpload.done).toHaveBeenCalledTimes(2)
     })
   })
+
+  describe('and retrieving avatar info', () => {
+    const sampleAvatarInfo = {
+      bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+      eyes: { color: { r: 0.1, g: 0.2, b: 0.3 } },
+      hair: { color: { r: 0.4, g: 0.5, b: 0.6 } },
+      skin: { color: { r: 0.7, g: 0.8, b: 0.9 } },
+      wearables: ['urn:decentraland:matic:collections-v2:hat'],
+      snapshots: { face256: 'bafkreiface', body: 'bafkrebody' }
+    }
+
+    describe('and the avatar.json exists', () => {
+      beforeEach(() => {
+        const body = {
+          transformToByteArray: jest.fn().mockResolvedValue(Buffer.from(JSON.stringify(sampleAvatarInfo)))
+        }
+        mockS3Client.send.mockResolvedValue({ Body: body })
+      })
+
+      it('should return the parsed AvatarInfo', async () => {
+        const result = await storage.retrieveAvatarInfo('entity-1')
+
+        expect(result).toEqual(sampleAvatarInfo)
+        expect(mockS3Client.send).toHaveBeenCalled()
+      })
+    })
+
+    describe('and the avatar.json does not exist (NoSuchKey)', () => {
+      beforeEach(() => {
+        const error = new Error('NoSuchKey') as any
+        error.name = 'NoSuchKey'
+        mockS3Client.send.mockRejectedValue(error)
+      })
+
+      it('should return undefined', async () => {
+        const result = await storage.retrieveAvatarInfo('entity-1')
+
+        expect(result).toBeUndefined()
+      })
+    })
+
+    describe('and an unexpected S3 error occurs', () => {
+      beforeEach(() => {
+        const error = new Error('InternalServerError') as any
+        error.name = 'InternalServerError'
+        mockS3Client.send.mockRejectedValue(error)
+      })
+
+      it('should return undefined and not throw (graceful degradation)', async () => {
+        await expect(storage.retrieveAvatarInfo('entity-1')).resolves.toBeUndefined()
+      })
+    })
+
+    describe('and the response body is empty', () => {
+      beforeEach(() => {
+        mockS3Client.send.mockResolvedValue({ Body: null })
+      })
+
+      it('should return undefined', async () => {
+        const result = await storage.retrieveAvatarInfo('entity-1')
+
+        expect(result).toBeUndefined()
+      })
+    })
+  })
+
+  describe('and storing avatar info', () => {
+    const sampleAvatarInfo = {
+      bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+      eyes: { color: { r: 0.1, g: 0.2, b: 0.3 } },
+      hair: { color: { r: 0.4, g: 0.5, b: 0.6 } },
+      skin: { color: { r: 0.7, g: 0.8, b: 0.9 } },
+      wearables: [],
+      snapshots: { face256: 'bafkreiface', body: 'bafkrebody' }
+    }
+
+    describe('and the upload succeeds', () => {
+      beforeEach(() => {
+        mockUpload.done.mockResolvedValue({})
+      })
+
+      it('should upload avatar info as JSON to the correct key', async () => {
+        await storage.storeAvatarInfo('entity-1', sampleAvatarInfo as any)
+
+        expect(mockUpload.done).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and the upload fails', () => {
+      beforeEach(() => {
+        mockUpload.done.mockRejectedValue(new Error('Upload failed'))
+      })
+
+      it('should not throw (failure is non-fatal)', async () => {
+        await expect(storage.storeAvatarInfo('entity-1', sampleAvatarInfo as any)).resolves.toBeUndefined()
+      })
+    })
+  })
+
+  describe('and deleting avatar info', () => {
+    describe('and the delete succeeds', () => {
+      beforeEach(() => {
+        mockS3Client.send.mockResolvedValue({})
+      })
+
+      it('should send a DeleteObjectsCommand', async () => {
+        await storage.deleteAvatarInfo('entity-1')
+
+        expect(mockS3Client.send).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and the delete fails', () => {
+      beforeEach(() => {
+        mockS3Client.send.mockRejectedValue(new Error('Delete failed'))
+      })
+
+      it('should not throw (failure is non-fatal)', async () => {
+        await expect(storage.deleteAvatarInfo('entity-1')).resolves.toBeUndefined()
+      })
+    })
+  })
 })

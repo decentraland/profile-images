@@ -1,4 +1,5 @@
 import fs from 'fs/promises'
+import { AvatarInfo } from '@dcl/schemas'
 import { AppComponents } from '../../src/types'
 import { IStorageComponent } from '../../src/adapters/storage'
 
@@ -52,11 +53,31 @@ export async function createInMemoryStorage({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
+  async function retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined> {
+    const key = `${prefix}/entities/${entity}/avatar.json`
+    const raw = storage.get(key)
+    if (!raw) {
+      return undefined
+    }
+    return JSON.parse(Buffer.from(raw).toString()) as AvatarInfo
+  }
+
+  async function storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void> {
+    await store(`${prefix}/entities/${entity}/avatar.json`, Buffer.from(JSON.stringify(avatarInfo)), 'application/json')
+  }
+
+  async function deleteAvatarInfo(entity: string): Promise<void> {
+    storage.delete(`${prefix}/entities/${entity}/avatar.json`)
+  }
+
   return {
     storeImages,
     storeFailure,
     deleteFailures,
     retrieveLastCheckedTimestamp,
-    storeLastCheckedTimestamp
+    storeLastCheckedTimestamp,
+    retrieveAvatarInfo,
+    storeAvatarInfo,
+    deleteAvatarInfo
   }
 }

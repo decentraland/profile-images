@@ -54,7 +54,10 @@ describe('when processing entities with image processor', () => {
       storeFailure: jest.fn(),
       deleteFailures: jest.fn(),
       retrieveLastCheckedTimestamp: jest.fn(),
-      storeLastCheckedTimestamp: jest.fn()
+      storeLastCheckedTimestamp: jest.fn(),
+      retrieveAvatarInfo: jest.fn().mockResolvedValue(undefined),
+      storeAvatarInfo: jest.fn().mockResolvedValue(undefined),
+      deleteAvatarInfo: jest.fn().mockResolvedValue(undefined)
     } as jest.Mocked<IStorageComponent>
 
     // Mock the metrics increment and observe methods
@@ -445,6 +448,246 @@ describe('when processing entities with image processor', () => {
 
       // Should be called once (only for the entity with successful storage)
       expect(metrics.observe).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ─── Change-detection tests ───────────────────────────────────────────────
+
+  describe('and the stored avatar matches the incoming avatar (unchanged)', () => {
+    beforeEach(() => {
+      // retrieveAvatarInfo returns an identical avatar — should skip render
+      storage.retrieveAvatarInfo.mockResolvedValue(testEntity.metadata.avatars[0].avatar)
+    })
+
+    it('should NOT call Godot', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).not.toHaveBeenCalled()
+    })
+
+    it('should return success: true with shouldRetry: false', async () => {
+      const result = await imageProcessor.processEntities([testEntity])
+
+      expect(result).toHaveLength(1)
+      expect(result[0]).toMatchObject({
+        entity: '1',
+        success: true,
+        shouldRetry: false
+      })
+    })
+
+    it('should increment the skipped metric', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'skipped' }, 1)
+    })
+
+    it('should NOT call storeAvatarInfo', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(storage.storeAvatarInfo).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and the stored avatar differs from the incoming avatar (changed wearables)', () => {
+    beforeEach(() => {
+      const differentAvatar = {
+        ...testEntity.metadata.avatars[0].avatar,
+        wearables: ['urn:decentraland:matic:collections-v2:different-hat']
+      }
+      storage.retrieveAvatarInfo.mockResolvedValue(differentAvatar as any)
+
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should call Godot', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledTimes(1)
+    })
+
+    it('should store the new avatar info after successful render', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(storage.storeAvatarInfo).toHaveBeenCalledWith('1', testEntity.metadata.avatars[0].avatar)
+    })
+  })
+
+  describe('and there is no stored avatar (first render)', () => {
+    beforeEach(() => {
+      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should call Godot', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledTimes(1)
+    })
+
+    it('should store avatar info after successful first render', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(storage.storeAvatarInfo).toHaveBeenCalledWith('1', testEntity.metadata.avatars[0].avatar)
+    })
+  })
+
+  describe('and Godot fails for a single entity', () => {
+    beforeEach(() => {
+      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: false,
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'error output'
+      })
+      storage.storeFailure.mockResolvedValue(undefined)
+    })
+
+    it('should call deleteAvatarInfo so the next retry always re-renders', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(storage.deleteAvatarInfo).toHaveBeenCalledWith('1')
+    })
+
+    it('should NOT call storeAvatarInfo', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(storage.storeAvatarInfo).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and a mixed batch has some unchanged and some changed entities', () => {
+    let changedEntity: Entity
+
+    beforeEach(() => {
+      changedEntity = createTestEntity('2')
+      // Force entity 2 to have different wearables
+      changedEntity = {
+        ...changedEntity,
+        metadata: {
+          avatars: [
+            {
+              avatar: {
+                ...changedEntity.metadata.avatars[0].avatar,
+                wearables: ['urn:decentraland:matic:collections-v2:new-hat']
+              }
+            }
+          ]
+        }
+      }
+
+      // Entity 1 unchanged, entity 2 changed
+      storage.retrieveAvatarInfo
+        .mockResolvedValueOnce(testEntity.metadata.avatars[0].avatar) // entity 1: same
+        .mockResolvedValueOnce(undefined) // entity 2: new
+
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '2',
+            success: true,
+            avatarPath: 'avatar2.png',
+            facePath: 'face2.png',
+            avatar: changedEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should only send the changed entity to Godot', async () => {
+      await imageProcessor.processEntities([testEntity, changedEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledTimes(1)
+      // Only entity 2 should be passed to Godot
+      const call = (godot.generateImages as jest.Mock).mock.calls[0][0]
+      expect(call).toHaveLength(1)
+      expect(call[0].entity).toBe('2')
+    })
+
+    it('should return results for ALL entities (both skipped and rendered)', async () => {
+      const results = await imageProcessor.processEntities([testEntity, changedEntity])
+
+      expect(results).toHaveLength(2)
+      const entityIds = results.map((r) => r.entity)
+      expect(entityIds).toContain('1')
+      expect(entityIds).toContain('2')
+    })
+
+    it('should return skipped entity as success', async () => {
+      const results = await imageProcessor.processEntities([testEntity, changedEntity])
+
+      const entity1Result = results.find((r) => r.entity === '1')
+      expect(entity1Result).toMatchObject({
+        success: true,
+        shouldRetry: false
+      })
+    })
+
+    it('should increment both success and skipped metrics', async () => {
+      await imageProcessor.processEntities([testEntity, changedEntity])
+
+      expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'skipped' }, 1)
+      expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'success' }, 1)
+    })
+  })
+
+  describe('and S3 read error occurs during avatar info retrieval', () => {
+    beforeEach(() => {
+      // Simulate a non-404 S3 error — should be treated as undefined (force render)
+      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntity.metadata.avatars[0].avatar
+          }
+        ],
+        output: 'success'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should fall back to rendering', async () => {
+      await imageProcessor.processEntities([testEntity])
+
+      expect(godot.generateImages).toHaveBeenCalledTimes(1)
     })
   })
 })
