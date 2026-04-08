@@ -31,9 +31,19 @@
 
 **Workflow:**
 
-1. Producer polls Catalyst for profile changes
-2. Detects new/updated profiles, queues rendering job to SQS
-3. Consumer receives job, fetches avatar data
-4. Consumer renders 3D avatar to 2D images (body, face)
-5. Consumer uploads images to S3
-6. Images served via CDN for applications
+1. Producer (external — `deployments-to-sqs` service) monitors Catalyst and publishes `CatalystDeploymentEvent` messages to SQS.
+2. Consumer receives job, fetches avatar data (from message payload or Catalyst fallback).
+3. Consumer reads previously-stored `AvatarInfo` from S3 (`entities/{entityId}/avatar.json`).
+4. Consumer compares visually-relevant fields (bodyShape, wearables, colors, forceRender) with the incoming avatar.
+5. **If unchanged**: skip Godot entirely — return synthetic success, delete SQS message. No re-render.
+6. **If changed or first render**: invoke Godot renderer to produce body + face images.
+7. On success: upload images to S3 and store the new `AvatarInfo` as `avatar.json` for future comparisons.
+8. On Godot failure (single entity): write failure record, delete `avatar.json` so the next DLQ retry always re-renders.
+9. Images served via CDN for applications.
+
+**Change Detection Notes:**
+
+- Comparison uses a canonical JSON of: `bodyShape` (lowercased), `wearables` (sorted+lowercased), `forceRender` (sorted+lowercased), `eyes/hair/skin` colors (rounded to 4 decimal places).
+- S3 read errors during avatar info retrieval are treated as "force render" (non-fatal degradation).
+- `avatar.json` is only written after `storeImages` succeeds; its own write failure is non-fatal (self-heals on next successful render).
+- A `snapshot_generation_count { status: 'skipped' }` metric is incremented for each skipped entity.
