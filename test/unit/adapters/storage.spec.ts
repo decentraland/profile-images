@@ -232,41 +232,42 @@ describe('when using storage component', () => {
     })
   })
 
-  describe('and retrieving avatar info', () => {
-    const sampleAvatarInfo = {
-      bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
-      eyes: { color: { r: 0.1, g: 0.2, b: 0.3 } },
-      hair: { color: { r: 0.4, g: 0.5, b: 0.6 } },
-      skin: { color: { r: 0.7, g: 0.8, b: 0.9 } },
-      wearables: ['urn:decentraland:matic:collections-v2:hat'],
-      snapshots: { face256: 'bafkreiface', body: 'bafkrebody' }
-    }
-
-    describe('and the avatar.json exists', () => {
+  describe('and retrieving avatar hash', () => {
+    describe('and the body.png exists with avatar-hash metadata', () => {
       beforeEach(() => {
-        const body = {
-          transformToByteArray: jest.fn().mockResolvedValue(Buffer.from(JSON.stringify(sampleAvatarInfo)))
-        }
-        mockS3Client.send.mockResolvedValue({ Body: body })
+        mockS3Client.send.mockResolvedValue({ Metadata: { 'avatar-hash': 'abc123hash' } })
       })
 
-      it('should return the parsed AvatarInfo', async () => {
-        const result = await storage.retrieveAvatarInfo('entity-1')
+      it('should return the hash from metadata', async () => {
+        const result = await storage.retrieveAvatarHash('entity-1')
 
-        expect(result).toEqual(sampleAvatarInfo)
+        expect(result).toBe('abc123hash')
         expect(mockS3Client.send).toHaveBeenCalled()
       })
     })
 
-    describe('and the avatar.json does not exist (NoSuchKey)', () => {
+    describe('and the body.png exists without avatar-hash metadata (pre-existing image)', () => {
       beforeEach(() => {
-        const error = new Error('NoSuchKey') as any
-        error.name = 'NoSuchKey'
+        mockS3Client.send.mockResolvedValue({ Metadata: {} })
+      })
+
+      it('should return undefined (triggers re-render for self-healing)', async () => {
+        const result = await storage.retrieveAvatarHash('entity-1')
+
+        expect(result).toBeUndefined()
+      })
+    })
+
+    describe('and the body.png does not exist (404)', () => {
+      beforeEach(() => {
+        const error = new Error('NotFound') as any
+        error.name = 'NotFound'
+        error.$metadata = { httpStatusCode: 404 }
         mockS3Client.send.mockRejectedValue(error)
       })
 
       it('should return undefined', async () => {
-        const result = await storage.retrieveAvatarInfo('entity-1')
+        const result = await storage.retrieveAvatarHash('entity-1')
 
         expect(result).toBeUndefined()
       })
@@ -280,77 +281,40 @@ describe('when using storage component', () => {
       })
 
       it('should return undefined and not throw (graceful degradation)', async () => {
-        await expect(storage.retrieveAvatarInfo('entity-1')).resolves.toBeUndefined()
-      })
-    })
-
-    describe('and the response body is empty', () => {
-      beforeEach(() => {
-        mockS3Client.send.mockResolvedValue({ Body: null })
-      })
-
-      it('should return undefined', async () => {
-        const result = await storage.retrieveAvatarInfo('entity-1')
-
-        expect(result).toBeUndefined()
+        await expect(storage.retrieveAvatarHash('entity-1')).resolves.toBeUndefined()
       })
     })
   })
 
-  describe('and storing avatar info', () => {
-    const sampleAvatarInfo = {
-      bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
-      eyes: { color: { r: 0.1, g: 0.2, b: 0.3 } },
-      hair: { color: { r: 0.4, g: 0.5, b: 0.6 } },
-      skin: { color: { r: 0.7, g: 0.8, b: 0.9 } },
-      wearables: [],
-      snapshots: { face256: 'bafkreiface', body: 'bafkrebody' }
-    }
-
-    describe('and the upload succeeds', () => {
-      beforeEach(() => {
-        mockUpload.done.mockResolvedValue({})
-      })
-
-      it('should upload avatar info as JSON to the correct key', async () => {
-        await storage.storeAvatarInfo('entity-1', sampleAvatarInfo as any)
-
-        expect(mockUpload.done).toHaveBeenCalledTimes(1)
-      })
+  describe('and storing images with avatar hash metadata', () => {
+    beforeEach(() => {
+      mockUpload.done.mockResolvedValue({})
     })
 
-    describe('and the upload fails', () => {
-      beforeEach(() => {
-        mockUpload.done.mockRejectedValue(new Error('Upload failed'))
-      })
+    it('should pass metadata to the body.png upload when avatarHash is provided', async () => {
+      await storage.storeImages('entity-1', '/tmp/avatar.png', '/tmp/face.png', 'abc123hash')
 
-      it('should not throw (failure is non-fatal)', async () => {
-        await expect(storage.storeAvatarInfo('entity-1', sampleAvatarInfo as any)).resolves.toBeUndefined()
-      })
-    })
-  })
+      const { Upload } = jest.requireMock('@aws-sdk/lib-storage')
+      // Upload is called twice: once for body.png and once for face.png
+      const bodyUploadCall = Upload.mock.calls.find(
+        (call: any[]) => call[0].params.Key === 'test-prefix/entities/entity-1/body.png'
+      )
+      expect(bodyUploadCall[0].params.Metadata).toEqual({ 'avatar-hash': 'abc123hash' })
 
-  describe('and deleting avatar info', () => {
-    describe('and the delete succeeds', () => {
-      beforeEach(() => {
-        mockS3Client.send.mockResolvedValue({})
-      })
-
-      it('should send a DeleteObjectsCommand', async () => {
-        await storage.deleteAvatarInfo('entity-1')
-
-        expect(mockS3Client.send).toHaveBeenCalledTimes(1)
-      })
+      const faceUploadCall = Upload.mock.calls.find(
+        (call: any[]) => call[0].params.Key === 'test-prefix/entities/entity-1/face.png'
+      )
+      expect(faceUploadCall[0].params.Metadata).toBeUndefined()
     })
 
-    describe('and the delete fails', () => {
-      beforeEach(() => {
-        mockS3Client.send.mockRejectedValue(new Error('Delete failed'))
-      })
+    it('should not pass metadata when avatarHash is not provided', async () => {
+      await storage.storeImages('entity-1', '/tmp/avatar.png', '/tmp/face.png')
 
-      it('should not throw (failure is non-fatal)', async () => {
-        await expect(storage.deleteAvatarInfo('entity-1')).resolves.toBeUndefined()
-      })
+      const { Upload } = jest.requireMock('@aws-sdk/lib-storage')
+      const bodyUploadCall = Upload.mock.calls.find(
+        (call: any[]) => call[0].params.Key === 'test-prefix/entities/entity-1/body.png'
+      )
+      expect(bodyUploadCall[0].params.Metadata).toBeUndefined()
     })
   })
 })

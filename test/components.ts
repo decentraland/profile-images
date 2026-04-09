@@ -46,9 +46,7 @@ async function initComponents(): Promise<TestComponents> {
     deleteFailures: jest.fn(),
     retrieveLastCheckedTimestamp: jest.fn(),
     storeLastCheckedTimestamp: jest.fn(),
-    retrieveAvatarInfo: jest.fn().mockResolvedValue(undefined),
-    storeAvatarInfo: jest.fn().mockResolvedValue(undefined),
-    deleteAvatarInfo: jest.fn().mockResolvedValue(undefined)
+    retrieveAvatarHash: jest.fn().mockResolvedValue(undefined)
   }
 
   // const sqsClient: SqsClient = {

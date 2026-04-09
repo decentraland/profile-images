@@ -1,6 +1,6 @@
 import { Entity } from '@dcl/schemas'
 import { AppComponents, ExtendedAvatar } from '../types'
-import { avatarsAreVisuallyEqual } from '../utils/avatar-comparison'
+import { computeAvatarHash } from '../utils/avatar-comparison'
 
 export type ProcessingResult = ExtendedAvatar & {
   success: boolean
@@ -38,23 +38,26 @@ export async function createImageProcessor({
       avatar: metadata.avatars[0].avatar
     }))
 
-    // Fetch stored avatar info for all entities in parallel to detect changes
-    const storedAvatarInfos = await Promise.all(
+    // Compute hashes for all incoming avatars and fetch stored hashes in parallel
+    const incomingHashes = new Map(avatars.map((a) => [a.entity, computeAvatarHash(a.avatar)]))
+
+    const storedHashes = await Promise.all(
       avatars.map(async ({ entity }) => ({
         entity,
-        stored: await storage.retrieveAvatarInfo(entity)
+        hash: await storage.retrieveAvatarHash(entity)
       }))
     )
 
-    const storedByEntity = new Map(storedAvatarInfos.map(({ entity, stored }) => [entity, stored]))
+    const storedByEntity = new Map(storedHashes.map(({ entity, hash }) => [entity, hash]))
 
     // Partition entities: those that need rendering vs those that can be skipped
     const needsRender: ExtendedAvatar[] = []
     const skipped: ExtendedAvatar[] = []
 
     for (const extAvatar of avatars) {
-      const stored = storedByEntity.get(extAvatar.entity)
-      if (stored !== undefined && avatarsAreVisuallyEqual(stored, extAvatar.avatar)) {
+      const storedHash = storedByEntity.get(extAvatar.entity)
+      const incomingHash = incomingHashes.get(extAvatar.entity)
+      if (storedHash && storedHash === incomingHash) {
         skipped.push(extAvatar)
       } else {
         needsRender.push(extAvatar)
@@ -84,7 +87,8 @@ export async function createImageProcessor({
       results.map(async (result) => {
         if (result.success) {
           metrics.increment('snapshot_generation_count', { status: 'success' }, 1)
-          const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
+          const hash = incomingHashes.get(result.entity)
+          const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath, hash)
 
           if (!success) {
             logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
@@ -96,10 +100,6 @@ export async function createImageProcessor({
               avatar: result.avatar
             }
           }
-
-          // Store the rendered avatar info so future identical deploys can be skipped.
-          // storeAvatarInfo failure is non-fatal: the next render will self-heal.
-          await storage.storeAvatarInfo(result.entity, result.avatar)
 
           const deploymentTimestamp = deploymentTimestamps.get(result.entity)
 
@@ -131,9 +131,6 @@ export async function createImageProcessor({
             outputGenerated
           }
           await storage.storeFailure(result.entity, JSON.stringify(failure))
-          // Delete stored avatar info so the next DLQ retry always re-renders instead of being
-          // incorrectly skipped by change detection.
-          await storage.deleteAvatarInfo(result.entity)
 
           return {
             entity: result.entity,

@@ -1,18 +1,15 @@
 import fs from 'fs/promises'
-import { DeleteObjectsCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
-import { AvatarInfo } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
 export type IStorageComponent = {
-  storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
+  storeImages(entity: string, avatarPath: string, facePath: string, avatarHash?: string): Promise<boolean>
   storeFailure(entity: string, failure: string): Promise<void>
   deleteFailures(entities: string[]): Promise<void>
   retrieveLastCheckedTimestamp(): Promise<undefined | number>
   storeLastCheckedTimestamp(ts: number): Promise<void>
-  retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined>
-  storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void>
-  deleteAvatarInfo(entity: string): Promise<void>
+  retrieveAvatarHash(entity: string): Promise<string | undefined>
 }
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
@@ -28,26 +25,38 @@ export async function createStorageComponent({
   const bucket = await config.requireString('BUCKET_NAME')
   const prefix = (await config.getString('S3_IMAGES_PREFIX')) || ''
 
-  async function store(key: string, content: Buffer, contentType: string): Promise<void> {
+  async function store(
+    key: string,
+    content: Buffer,
+    contentType: string,
+    metadata?: Record<string, string>
+  ): Promise<void> {
     const upload = new Upload({
       client: s3,
       params: {
         Bucket: bucket,
         Key: `${key}`,
         Body: content,
-        ContentType: contentType
+        ContentType: contentType,
+        ...(metadata && { Metadata: metadata })
       }
     })
     await upload.done()
   }
 
-  async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
+  async function storeImages(
+    entity: string,
+    avatarPath: string,
+    facePath: string,
+    avatarHash?: string
+  ): Promise<boolean> {
     const timer = metrics.startTimer('image_upload_duration_seconds')
     let status = 'success'
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
+      const bodyMetadata = avatarHash ? { 'avatar-hash': avatarHash } : undefined
       await Promise.all([
-        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
+        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png', bodyMetadata),
         store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       ])
       return true
@@ -100,50 +109,20 @@ export async function createStorageComponent({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
-  async function retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined> {
-    const command = new GetObjectCommand({
+  async function retrieveAvatarHash(entity: string): Promise<string | undefined> {
+    const command = new HeadObjectCommand({
       Bucket: bucket,
-      Key: `${prefix}/entities/${entity}/avatar.json`
+      Key: `${prefix}/entities/${entity}/body.png`
     })
     try {
       const output = await s3.send(command)
-      if (!output.Body) {
-        return undefined
-      }
-      const content = Buffer.from(await output.Body.transformToByteArray()).toString()
-      return JSON.parse(content) as AvatarInfo
+      return output.Metadata?.['avatar-hash']
     } catch (e: any) {
-      if (e.name === 'NoSuchKey') {
+      if (e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404) {
         return undefined
       }
-      logger.warn(`Error retrieving avatar info for entity=${entity}, falling back to re-render: ${e.message}`)
+      logger.warn(`Error retrieving avatar hash for entity=${entity}, falling back to re-render: ${e.message}`)
       return undefined
-    }
-  }
-
-  async function storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void> {
-    try {
-      await store(
-        `${prefix}/entities/${entity}/avatar.json`,
-        Buffer.from(JSON.stringify(avatarInfo)),
-        'application/json'
-      )
-    } catch (e: any) {
-      logger.warn(`Error storing avatar info for entity=${entity}: ${e.message}`)
-    }
-  }
-
-  async function deleteAvatarInfo(entity: string): Promise<void> {
-    try {
-      const command = new DeleteObjectsCommand({
-        Bucket: bucket,
-        Delete: {
-          Objects: [{ Key: `${prefix}/entities/${entity}/avatar.json` }]
-        }
-      })
-      await s3.send(command)
-    } catch (e: any) {
-      logger.warn(`Error deleting avatar info for entity=${entity}: ${e.message}`)
     }
   }
 
@@ -153,8 +132,6 @@ export async function createStorageComponent({
     deleteFailures,
     retrieveLastCheckedTimestamp,
     storeLastCheckedTimestamp,
-    retrieveAvatarInfo,
-    storeAvatarInfo,
-    deleteAvatarInfo
+    retrieveAvatarHash
   }
 }

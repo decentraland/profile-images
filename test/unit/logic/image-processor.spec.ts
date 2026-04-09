@@ -7,6 +7,7 @@ import { metricDeclarations } from '../../../src/metrics'
 import { createGodotMock } from '../../mocks/godot-mock'
 import { IStorageComponent } from '../../../src/adapters/storage'
 import { IConfigComponent, ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import { computeAvatarHash } from '../../../src/utils/avatar-comparison'
 
 describe('when processing entities with image processor', () => {
   const COMMIT_HASH = 'abc123'
@@ -55,9 +56,7 @@ describe('when processing entities with image processor', () => {
       deleteFailures: jest.fn(),
       retrieveLastCheckedTimestamp: jest.fn(),
       storeLastCheckedTimestamp: jest.fn(),
-      retrieveAvatarInfo: jest.fn().mockResolvedValue(undefined),
-      storeAvatarInfo: jest.fn().mockResolvedValue(undefined),
-      deleteAvatarInfo: jest.fn().mockResolvedValue(undefined)
+      retrieveAvatarHash: jest.fn().mockResolvedValue(undefined)
     } as jest.Mocked<IStorageComponent>
 
     // Mock the metrics increment and observe methods
@@ -113,7 +112,7 @@ describe('when processing entities with image processor', () => {
           avatar: testEntity.metadata.avatars[0].avatar
         }
       ])
-      expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png')
+      expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png', expect.any(String))
     })
 
     it('should increment success metrics', async () => {
@@ -453,10 +452,11 @@ describe('when processing entities with image processor', () => {
 
   // ─── Change-detection tests ───────────────────────────────────────────────
 
-  describe('and the stored avatar matches the incoming avatar (unchanged)', () => {
+  describe('and the stored hash matches the incoming avatar (unchanged)', () => {
     beforeEach(() => {
-      // retrieveAvatarInfo returns an identical avatar — should skip render
-      storage.retrieveAvatarInfo.mockResolvedValue(testEntity.metadata.avatars[0].avatar)
+      // Import computeAvatarHash to get the expected hash for the test avatar
+      const hash = computeAvatarHash(testEntity.metadata.avatars[0].avatar)
+      storage.retrieveAvatarHash.mockResolvedValue(hash)
     })
 
     it('should NOT call Godot', async () => {
@@ -482,20 +482,17 @@ describe('when processing entities with image processor', () => {
       expect(metrics.increment).toHaveBeenCalledWith('snapshot_generation_count', { status: 'skipped' }, 1)
     })
 
-    it('should NOT call storeAvatarInfo', async () => {
+    it('should NOT call storeImages', async () => {
       await imageProcessor.processEntities([testEntity])
 
-      expect(storage.storeAvatarInfo).not.toHaveBeenCalled()
+      expect(storage.storeImages).not.toHaveBeenCalled()
     })
   })
 
-  describe('and the stored avatar differs from the incoming avatar (changed wearables)', () => {
+  describe('and the stored hash differs from the incoming avatar (changed wearables)', () => {
     beforeEach(() => {
-      const differentAvatar = {
-        ...testEntity.metadata.avatars[0].avatar,
-        wearables: ['urn:decentraland:matic:collections-v2:different-hat']
-      }
-      storage.retrieveAvatarInfo.mockResolvedValue(differentAvatar as any)
+      // Return a different hash to simulate changed avatar
+      storage.retrieveAvatarHash.mockResolvedValue('different-hash-value')
 
       godot.generateImages.mockResolvedValue({
         avatars: [
@@ -518,16 +515,19 @@ describe('when processing entities with image processor', () => {
       expect(godot.generateImages).toHaveBeenCalledTimes(1)
     })
 
-    it('should store the new avatar info after successful render', async () => {
+    it('should pass the avatar hash to storeImages', async () => {
       await imageProcessor.processEntities([testEntity])
 
-      expect(storage.storeAvatarInfo).toHaveBeenCalledWith('1', testEntity.metadata.avatars[0].avatar)
+      expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png', expect.any(String))
+      // Verify the hash is a 64-char hex string (SHA-256)
+      const passedHash = storage.storeImages.mock.calls[0][3]
+      expect(passedHash).toMatch(/^[0-9a-f]{64}$/)
     })
   })
 
-  describe('and there is no stored avatar (first render)', () => {
+  describe('and there is no stored hash (first render)', () => {
     beforeEach(() => {
-      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+      storage.retrieveAvatarHash.mockResolvedValue(undefined)
 
       godot.generateImages.mockResolvedValue({
         avatars: [
@@ -550,16 +550,16 @@ describe('when processing entities with image processor', () => {
       expect(godot.generateImages).toHaveBeenCalledTimes(1)
     })
 
-    it('should store avatar info after successful first render', async () => {
+    it('should pass hash to storeImages after successful first render', async () => {
       await imageProcessor.processEntities([testEntity])
 
-      expect(storage.storeAvatarInfo).toHaveBeenCalledWith('1', testEntity.metadata.avatars[0].avatar)
+      expect(storage.storeImages).toHaveBeenCalledWith('1', 'avatar1.png', 'face1.png', expect.any(String))
     })
   })
 
-  describe('and Godot fails for a single entity', () => {
+  describe('and Godot fails for a single entity (change detection)', () => {
     beforeEach(() => {
-      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+      storage.retrieveAvatarHash.mockResolvedValue(undefined)
 
       godot.generateImages.mockResolvedValue({
         avatars: [
@@ -574,16 +574,10 @@ describe('when processing entities with image processor', () => {
       storage.storeFailure.mockResolvedValue(undefined)
     })
 
-    it('should call deleteAvatarInfo so the next retry always re-renders', async () => {
+    it('should NOT call storeImages (no cleanup needed — body.png was never overwritten)', async () => {
       await imageProcessor.processEntities([testEntity])
 
-      expect(storage.deleteAvatarInfo).toHaveBeenCalledWith('1')
-    })
-
-    it('should NOT call storeAvatarInfo', async () => {
-      await imageProcessor.processEntities([testEntity])
-
-      expect(storage.storeAvatarInfo).not.toHaveBeenCalled()
+      expect(storage.storeImages).not.toHaveBeenCalled()
     })
   })
 
@@ -607,10 +601,11 @@ describe('when processing entities with image processor', () => {
         }
       }
 
-      // Entity 1 unchanged, entity 2 changed
-      storage.retrieveAvatarInfo
-        .mockResolvedValueOnce(testEntity.metadata.avatars[0].avatar) // entity 1: same
-        .mockResolvedValueOnce(undefined) // entity 2: new
+      // Entity 1: stored hash matches incoming → skip
+      const entity1Hash = computeAvatarHash(testEntity.metadata.avatars[0].avatar)
+      storage.retrieveAvatarHash
+        .mockResolvedValueOnce(entity1Hash) // entity 1: same hash
+        .mockResolvedValueOnce(undefined) // entity 2: no stored hash (new)
 
       godot.generateImages.mockResolvedValue({
         avatars: [
@@ -664,10 +659,10 @@ describe('when processing entities with image processor', () => {
     })
   })
 
-  describe('and S3 read error occurs during avatar info retrieval', () => {
+  describe('and S3 read error occurs during avatar hash retrieval', () => {
     beforeEach(() => {
       // Simulate a non-404 S3 error — should be treated as undefined (force render)
-      storage.retrieveAvatarInfo.mockResolvedValue(undefined)
+      storage.retrieveAvatarHash.mockResolvedValue(undefined)
 
       godot.generateImages.mockResolvedValue({
         avatars: [

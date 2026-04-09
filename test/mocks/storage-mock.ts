@@ -1,5 +1,4 @@
 import fs from 'fs/promises'
-import { AvatarInfo } from '@dcl/schemas'
 import { AppComponents } from '../../src/types'
 import { IStorageComponent } from '../../src/adapters/storage'
 
@@ -8,6 +7,7 @@ export async function createInMemoryStorage({
   logs
 }: Pick<AppComponents, 'config' | 'logs'>): Promise<IStorageComponent> {
   const storage: Map<string, Uint8Array> = new Map()
+  const metadata: Map<string, Record<string, string>> = new Map()
   const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
 
   const logger = logs.getLogger('in-memory-storage')
@@ -17,13 +17,22 @@ export async function createInMemoryStorage({
     storage.set(key, new Uint8Array(content.buffer))
   }
 
-  async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
+  async function storeImages(
+    entity: string,
+    avatarPath: string,
+    facePath: string,
+    avatarHash?: string
+  ): Promise<boolean> {
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
+      const bodyKey = `${prefix}/entities/${entity}/body.png`
       await Promise.all([
-        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
+        store(bodyKey, body, 'image/png'),
         store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       ])
+      if (avatarHash) {
+        metadata.set(bodyKey, { 'avatar-hash': avatarHash })
+      }
       return true
     } catch (err) {
       logger.debug(`Error uploading images to bucket, marking job for retrying it: "${entity}"`)
@@ -53,21 +62,10 @@ export async function createInMemoryStorage({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
-  async function retrieveAvatarInfo(entity: string): Promise<AvatarInfo | undefined> {
-    const key = `${prefix}/entities/${entity}/avatar.json`
-    const raw = storage.get(key)
-    if (!raw) {
-      return undefined
-    }
-    return JSON.parse(Buffer.from(raw).toString()) as AvatarInfo
-  }
-
-  async function storeAvatarInfo(entity: string, avatarInfo: AvatarInfo): Promise<void> {
-    await store(`${prefix}/entities/${entity}/avatar.json`, Buffer.from(JSON.stringify(avatarInfo)), 'application/json')
-  }
-
-  async function deleteAvatarInfo(entity: string): Promise<void> {
-    storage.delete(`${prefix}/entities/${entity}/avatar.json`)
+  async function retrieveAvatarHash(entity: string): Promise<string | undefined> {
+    const key = `${prefix}/entities/${entity}/body.png`
+    const meta = metadata.get(key)
+    return meta?.['avatar-hash']
   }
 
   return {
@@ -76,8 +74,6 @@ export async function createInMemoryStorage({
     deleteFailures,
     retrieveLastCheckedTimestamp,
     storeLastCheckedTimestamp,
-    retrieveAvatarInfo,
-    storeAvatarInfo,
-    deleteAvatarInfo
+    retrieveAvatarHash
   }
 }

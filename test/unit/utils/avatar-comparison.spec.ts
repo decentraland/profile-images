@@ -1,5 +1,5 @@
 import { AvatarInfo } from '@dcl/schemas'
-import { avatarsAreVisuallyEqual, canonicalAvatarKey } from '../../../src/utils/avatar-comparison'
+import { computeAvatarHash, canonicalAvatarKey } from '../../../src/utils/avatar-comparison'
 
 const baseAvatar: AvatarInfo = {
   bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
@@ -11,152 +11,155 @@ const baseAvatar: AvatarInfo = {
 }
 
 describe('avatar-comparison', () => {
-  describe('avatarsAreVisuallyEqual', () => {
-    describe('and both avatars are identical', () => {
-      it('should return true', () => {
-        expect(avatarsAreVisuallyEqual(baseAvatar, { ...baseAvatar })).toBe(true)
-      })
+  describe('computeAvatarHash', () => {
+    it('should return a 64-character hex string (SHA-256)', () => {
+      const hash = computeAvatarHash(baseAvatar)
+      expect(hash).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('should return the same hash for identical avatars', () => {
+      expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash({ ...baseAvatar }))
     })
 
     describe('and wearables differ', () => {
-      it('should return false when a wearable is added', () => {
+      it('should return different hash when a wearable is added', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           wearables: [...baseAvatar.wearables, 'urn:decentraland:matic:collections-v2:pants']
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
 
-      it('should return false when a wearable is removed', () => {
+      it('should return different hash when a wearable is removed', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           wearables: [baseAvatar.wearables[0]]
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
 
-      it('should return false when a wearable is replaced', () => {
+      it('should return different hash when a wearable is replaced', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           wearables: ['urn:decentraland:matic:collections-v2:different-hat', baseAvatar.wearables[1]]
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
     })
 
     describe('and wearables are in a different order', () => {
-      it('should return true (order-independent comparison)', () => {
+      it('should return the same hash (order-independent comparison)', () => {
         const reordered: AvatarInfo = {
           ...baseAvatar,
           wearables: [...baseAvatar.wearables].reverse()
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, reordered)).toBe(true)
+        expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash(reordered))
       })
     })
 
     describe('and wearables differ only in case', () => {
-      it('should return true (case-insensitive comparison)', () => {
+      it('should return the same hash (case-insensitive comparison)', () => {
         const upperCased: AvatarInfo = {
           ...baseAvatar,
           wearables: baseAvatar.wearables.map((w) => w.toUpperCase())
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, upperCased)).toBe(true)
+        expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash(upperCased))
       })
     })
 
     describe('and bodyShape differs', () => {
-      it('should return false', () => {
+      it('should return different hash', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseFemale'
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
 
-      it('should return true when bodyShape differs only in case', () => {
+      it('should return same hash when bodyShape differs only in case', () => {
         const upperCased: AvatarInfo = {
           ...baseAvatar,
           bodyShape: baseAvatar.bodyShape.toUpperCase()
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, upperCased)).toBe(true)
+        expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash(upperCased))
       })
     })
 
     describe('and eye color differs', () => {
-      it('should return false', () => {
+      it('should return different hash', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           eyes: { color: { r: 0.9, g: 0.2, b: 0.3 } }
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
     })
 
     describe('and hair color differs', () => {
-      it('should return false', () => {
+      it('should return different hash', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           hair: { color: { r: 0.9, g: 0.5, b: 0.6 } }
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
     })
 
     describe('and skin color differs', () => {
-      it('should return false', () => {
+      it('should return different hash', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           skin: { color: { r: 0.9, g: 0.8, b: 0.9 } }
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
     })
 
     describe('and color values differ only beyond 4 decimal places (float noise)', () => {
-      it('should return true', () => {
+      it('should return the same hash', () => {
         const almostSame: AvatarInfo = {
           ...baseAvatar,
           eyes: { color: { r: 0.10001, g: 0.20001, b: 0.30001 } }
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, almostSame)).toBe(true)
+        expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash(almostSame))
       })
     })
 
     describe('and forceRender differs', () => {
-      it('should return false when forceRender is added', () => {
+      it('should return different hash when forceRender is added', () => {
         const changed: AvatarInfo = {
           ...baseAvatar,
           forceRender: ['helmet' as any]
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, changed)).toBe(false)
+        expect(computeAvatarHash(baseAvatar)).not.toBe(computeAvatarHash(changed))
       })
 
-      it('should return false when forceRender content changes', () => {
+      it('should return different hash when forceRender content changes', () => {
         const a: AvatarInfo = { ...baseAvatar, forceRender: ['helmet' as any] }
         const b: AvatarInfo = { ...baseAvatar, forceRender: ['mask' as any] }
-        expect(avatarsAreVisuallyEqual(a, b)).toBe(false)
+        expect(computeAvatarHash(a)).not.toBe(computeAvatarHash(b))
       })
 
-      it('should return true when forceRender is same but reordered', () => {
+      it('should return the same hash when forceRender is same but reordered', () => {
         const a: AvatarInfo = { ...baseAvatar, forceRender: ['helmet' as any, 'mask' as any] }
         const b: AvatarInfo = { ...baseAvatar, forceRender: ['mask' as any, 'helmet' as any] }
-        expect(avatarsAreVisuallyEqual(a, b)).toBe(true)
+        expect(computeAvatarHash(a)).toBe(computeAvatarHash(b))
       })
 
-      it('should return true when forceRender is same but different case', () => {
+      it('should return the same hash when forceRender is same but different case', () => {
         const a: AvatarInfo = { ...baseAvatar, forceRender: ['Helmet' as any] }
         const b: AvatarInfo = { ...baseAvatar, forceRender: ['helmet' as any] }
-        expect(avatarsAreVisuallyEqual(a, b)).toBe(true)
+        expect(computeAvatarHash(a)).toBe(computeAvatarHash(b))
       })
     })
 
     describe('and snapshots differ (non-visual field)', () => {
-      it('should return true (snapshots are excluded from comparison)', () => {
+      it('should return the same hash (snapshots are excluded from comparison)', () => {
         const differentSnapshot: AvatarInfo = {
           ...baseAvatar,
           snapshots: { face256: 'bafkreidifferentface' as any, body: 'bafkreidifferentbody' as any }
         }
-        expect(avatarsAreVisuallyEqual(baseAvatar, differentSnapshot)).toBe(true)
+        expect(computeAvatarHash(baseAvatar)).toBe(computeAvatarHash(differentSnapshot))
       })
     })
 
@@ -164,13 +167,13 @@ describe('avatar-comparison', () => {
       it('should handle null wearables gracefully', () => {
         const nullWearables: AvatarInfo = { ...baseAvatar, wearables: null as any }
         const emptyWearables: AvatarInfo = { ...baseAvatar, wearables: [] }
-        expect(avatarsAreVisuallyEqual(nullWearables, emptyWearables)).toBe(true)
+        expect(computeAvatarHash(nullWearables)).toBe(computeAvatarHash(emptyWearables))
       })
 
       it('should handle undefined wearables gracefully', () => {
         const undefinedWearables: AvatarInfo = { ...baseAvatar, wearables: undefined as any }
         const emptyWearables: AvatarInfo = { ...baseAvatar, wearables: [] }
-        expect(avatarsAreVisuallyEqual(undefinedWearables, emptyWearables)).toBe(true)
+        expect(computeAvatarHash(undefinedWearables)).toBe(computeAvatarHash(emptyWearables))
       })
     })
   })

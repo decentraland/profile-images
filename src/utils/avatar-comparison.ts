@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { AvatarInfo } from '@dcl/schemas'
 
 const PRECISION = 4
@@ -42,10 +43,10 @@ export function canonicalAvatarKey(avatar: AvatarInfo): string {
 }
 
 /**
- * Returns true when two AvatarInfo objects are visually identical (same rendered appearance).
- * Wearable URNs are compared case-insensitively and order-independently.
- * Colors are compared with 4-decimal-place precision to avoid float serialization artifacts.
+ * Computes a SHA-256 hash of the visually-relevant fields of an AvatarInfo.
+ * Used for content-addressed change detection: if the hash matches a previously
+ * stored hash, the avatar's rendered appearance has not changed.
  */
-export function avatarsAreVisuallyEqual(a: AvatarInfo, b: AvatarInfo): boolean {
-  return canonicalAvatarKey(a) === canonicalAvatarKey(b)
+export function computeAvatarHash(avatar: AvatarInfo): string {
+  return createHash('sha256').update(canonicalAvatarKey(avatar)).digest('hex')
 }
