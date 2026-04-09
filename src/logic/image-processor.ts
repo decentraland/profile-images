@@ -88,6 +88,11 @@ export async function createImageProcessor({
         if (result.success) {
           metrics.increment('snapshot_generation_count', { status: 'success' }, 1)
           const hash = incomingHashes.get(result.entity)
+          if (!hash) {
+            logger.warn(
+              `No precomputed avatar hash for entity=${result.entity} — image will be stored without change-detection metadata`
+            )
+          }
           const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath, hash)
 
           if (!success) {
@@ -158,7 +163,20 @@ export async function createImageProcessor({
       resultByEntity.set(r.entity, r)
     }
 
-    return entities.map(({ id }) => resultByEntity.get(id)!)
+    return entities.map(({ id, metadata }) => {
+      const result = resultByEntity.get(id)
+      if (!result) {
+        logger.error(`No processing result for entity=${id} — Godot returned fewer results than expected`)
+        return {
+          entity: id,
+          success: false,
+          shouldRetry: true,
+          error: 'Missing processing result',
+          avatar: metadata.avatars[0].avatar
+        }
+      }
+      return result
+    })
   }
 
   return {
