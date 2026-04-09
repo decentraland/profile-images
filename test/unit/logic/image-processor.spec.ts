@@ -685,4 +685,39 @@ describe('when processing entities with image processor', () => {
       expect(godot.generateImages).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('and Godot returns fewer results than input entities', () => {
+    beforeEach(() => {
+      storage.retrieveAvatarHash.mockResolvedValue(undefined)
+
+      // Godot receives 2 entities but only returns a result for entity 1
+      godot.generateImages.mockResolvedValue({
+        avatars: [
+          {
+            entity: '1',
+            success: true,
+            avatarPath: 'avatar1.png',
+            facePath: 'face1.png',
+            avatar: testEntities[0].metadata.avatars[0].avatar
+          }
+        ],
+        output: 'partial'
+      })
+      storage.storeImages.mockResolvedValue(true)
+    })
+
+    it('should return a retry-able failure for the missing entity', async () => {
+      const results = await imageProcessor.processEntities(testEntities)
+
+      expect(results).toHaveLength(2)
+
+      const missingResult = results.find((r) => r.entity === '2')
+      expect(missingResult).toMatchObject({
+        entity: '2',
+        success: false,
+        shouldRetry: true,
+        error: 'Missing processing result'
+      })
+    })
+  })
 })
