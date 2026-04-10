@@ -12,6 +12,7 @@
     "test": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",
     "test:unit": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",
     "test:integration": "docker compose up -d localstack && sleep 5 && jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration; docker compose down",
+    "test:all": "yarn test:unit && yarn test:integration",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage --verbose --testPathPattern=test/unit"
   },
   "license": "Apache-2.0",
