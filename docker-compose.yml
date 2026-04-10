@@ -3,21 +3,11 @@ services:
     container_name: localstack
     image: localstack/localstack:4.12.0
     ports:
-      - '0.0.0.0:4566:4566' # LocalStack Gateway
-      - '0.0.0.0:4510-4559:4510-4559' # external services port range
+      - '4566:4566'
     environment:
-      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
-      - DEBUG=${DEBUG:-0}
       - SERVICES=sqs,sns,s3
     volumes:
       - './scripts/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh'
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - profile-images-network
 
   profile-images:
     container_name: profile-images
@@ -43,8 +33,7 @@ services:
       - CURRENT_VERSION=1.0.0
       - PEER_URL=https://peer.decentraland.org
     depends_on:
-      localstack:
-        condition: service_healthy
+      - localstack
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/status']
       interval: 10s
@@ -53,9 +42,3 @@ services:
       start_period: 30s
     volumes:
       - ./output:/app/output
-    networks:
-      - profile-images-network
-
-networks:
-  profile-images-network:
-    driver: bridge
