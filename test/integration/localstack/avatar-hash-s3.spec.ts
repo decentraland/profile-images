@@ -1,9 +1,9 @@
-import { createStorageComponent, IStorageComponent } from '../../src/adapters/storage'
+import { createStorageComponent, IStorageComponent } from '../../../src/adapters/storage'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
 import { createTestMetricsComponent } from '@well-known-components/metrics'
-import { metricDeclarations } from '../../src/metrics'
-import { computeAvatarHash } from '../../src/utils/avatar-comparison'
+import { metricDeclarations } from '../../../src/metrics'
+import { computeAvatarHash } from '../../../src/utils/avatar-comparison'
 import { AvatarInfo } from '@dcl/schemas'
 import { S3Client, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import * as fs from 'fs/promises'
@@ -87,8 +87,8 @@ describe('when verifying avatar hash storage and retrieval via S3 metadata', () 
   async function createDummyImages(suffix: string): Promise<{ avatarPath: string; facePath: string }> {
     const avatarPath = path.join(tmpDir, `${suffix}_body.png`)
     const facePath = path.join(tmpDir, `${suffix}_face.png`)
-    await fs.writeFile(avatarPath, Buffer.from('dummy-body-png'))
-    await fs.writeFile(facePath, Buffer.from('dummy-face-png'))
+    await fs.writeFile(avatarPath, Buffer.from('dummy-body-png').toString('utf-8'))
+    await fs.writeFile(facePath, Buffer.from('dummy-face-png').toString('utf-8'))
     return { avatarPath, facePath }
   }
 
