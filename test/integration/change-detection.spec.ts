@@ -11,21 +11,13 @@ import * as path from 'path'
 import * as os from 'os'
 
 /**
- * Integration tests for the change-detection optimization against real LocalStack S3.
+ * Integration tests for the avatar hash storage and retrieval against real LocalStack S3.
  *
- * Prerequisites:
- *   docker compose up -d localstack
- *
- * Run:
- *   yarn test --testPathPattern=change-detection
- *
- * These tests verify that:
- * - storeImages writes avatar-hash as S3 object metadata on body.png
- * - retrieveAvatarHash reads the hash back via HeadObject
- * - The full skip/render decision works end-to-end with real S3
+ * Run via: yarn test:integration
+ * (starts LocalStack automatically, runs tests, tears down)
  */
-describe('when testing change detection against LocalStack', () => {
-  const ENTITY_ID = 'integration-test-change-detection'
+describe('when verifying avatar hash storage and retrieval via S3 metadata', () => {
+  const ENTITY_ID = 'integration-test-avatar-hash'
   const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT || 'http://localhost:4566'
 
   let storage: IStorageComponent
@@ -69,15 +61,11 @@ describe('when testing change detection against LocalStack', () => {
     }
 
     s3 = new S3Client(awsConfig)
-
     storage = await createStorageComponent({ awsConfig, config, metrics, logs })
-
-    // Create temp dir for dummy images
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'profile-images-test-'))
   })
 
   beforeEach(async () => {
-    // Clean up test entity from S3
     try {
       await s3.send(
         new DeleteObjectsCommand({
@@ -93,12 +81,12 @@ describe('when testing change detection against LocalStack', () => {
   })
 
   afterAll(async () => {
-    await fs.rm(tmpDir, { recursive: true, force: true })
+    if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  async function createDummyImages(entityId: string): Promise<{ avatarPath: string; facePath: string }> {
-    const avatarPath = path.join(tmpDir, `${entityId}_body.png`)
-    const facePath = path.join(tmpDir, `${entityId}_face.png`)
+  async function createDummyImages(suffix: string): Promise<{ avatarPath: string; facePath: string }> {
+    const avatarPath = path.join(tmpDir, `${suffix}_body.png`)
+    const facePath = path.join(tmpDir, `${suffix}_face.png`)
     await fs.writeFile(avatarPath, Buffer.from('dummy-body-png'))
     await fs.writeFile(facePath, Buffer.from('dummy-face-png'))
     return { avatarPath, facePath }
@@ -107,7 +95,6 @@ describe('when testing change detection against LocalStack', () => {
   describe('and no previous image exists (first render)', () => {
     it('should return undefined from retrieveAvatarHash', async () => {
       const hash = await storage.retrieveAvatarHash(ENTITY_ID)
-
       expect(hash).toBeUndefined()
     })
   })
@@ -124,7 +111,6 @@ describe('when testing change detection against LocalStack', () => {
 
     it('should store the hash as S3 metadata on body.png', async () => {
       const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
       expect(storedHash).toBe(expectedHash)
     })
 
@@ -132,104 +118,70 @@ describe('when testing change detection against LocalStack', () => {
       it('should detect the hash match (skip scenario)', async () => {
         const incomingHash = computeAvatarHash(avatar)
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).toBe(incomingHash)
       })
     })
 
     describe('and the avatar changes wearables', () => {
-      let changedAvatar: AvatarInfo
-
-      beforeEach(() => {
-        changedAvatar = {
+      it('should detect the hash mismatch (re-render scenario)', async () => {
+        const changedAvatar: AvatarInfo = {
           ...avatar,
           wearables: [
             ...avatar.wearables,
             'urn:decentraland:matic:collections-v2:0xf6f601efee04e74cecac02c8c5bdc8cc0fc1c721:0:3'
           ]
         }
-      })
-
-      it('should detect the hash mismatch (re-render scenario)', async () => {
         const incomingHash = computeAvatarHash(changedAvatar)
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).not.toBe(incomingHash)
       })
     })
 
     describe('and the avatar changes eye color', () => {
-      let changedAvatar: AvatarInfo
-
-      beforeEach(() => {
-        changedAvatar = {
-          ...avatar,
-          eyes: { color: { r: 0.99, g: 0.01, b: 0.5 } }
-        }
-      })
-
       it('should detect the hash mismatch (re-render scenario)', async () => {
+        const changedAvatar: AvatarInfo = { ...avatar, eyes: { color: { r: 0.99, g: 0.01, b: 0.5 } } }
         const incomingHash = computeAvatarHash(changedAvatar)
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).not.toBe(incomingHash)
       })
     })
 
     describe('and the avatar changes body shape', () => {
-      let changedAvatar: AvatarInfo
-
-      beforeEach(() => {
-        changedAvatar = {
+      it('should detect the hash mismatch (re-render scenario)', async () => {
+        const changedAvatar: AvatarInfo = {
           ...avatar,
           bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseFemale'
         }
-      })
-
-      it('should detect the hash mismatch (re-render scenario)', async () => {
         const incomingHash = computeAvatarHash(changedAvatar)
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).not.toBe(incomingHash)
       })
     })
 
-    describe('and only non-visual fields change (name, description, emotes)', () => {
-      let changedAvatar: AvatarInfo
-
-      beforeEach(() => {
-        changedAvatar = {
+    describe('and only non-visual fields change (emotes, snapshots)', () => {
+      it('should detect the hash match (skip scenario)', async () => {
+        const changedAvatar: AvatarInfo = {
           ...avatar,
           emotes: [{ slot: 0, urn: 'urn:decentraland:off-chain:base-emotes:wave' }],
           snapshots: { face256: 'bafkreidifferent' as any, body: 'bafkreidifferent' as any }
         }
-      })
-
-      it('should detect the hash MATCH (skip scenario — non-visual changes)', async () => {
         const incomingHash = computeAvatarHash(changedAvatar)
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).toBe(incomingHash)
       })
     })
 
     describe('and a re-render overwrites the image with a new hash', () => {
-      let newHash: string
-
-      beforeEach(async () => {
+      it('should return the updated hash on next retrieval', async () => {
         const changedAvatar: AvatarInfo = {
           ...avatar,
           wearables: ['urn:decentraland:off-chain:base-avatars:new-hat']
         }
-        newHash = computeAvatarHash(changedAvatar)
+        const newHash = computeAvatarHash(changedAvatar)
         const { avatarPath, facePath } = await createDummyImages(`${ENTITY_ID}-v2`)
-        const success = await storage.storeImages(ENTITY_ID, avatarPath, facePath, newHash)
-        expect(success).toBe(true)
-      })
+        await storage.storeImages(ENTITY_ID, avatarPath, facePath, newHash)
 
-      it('should return the updated hash on next HeadObject', async () => {
         const storedHash = await storage.retrieveAvatarHash(ENTITY_ID)
-
         expect(storedHash).toBe(newHash)
       })
     })

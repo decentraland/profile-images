@@ -54,11 +54,13 @@ export async function createStorageComponent({
     let status = 'success'
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
+      // Upload face first, then body with avatar-hash metadata.
+      // This ordering ensures the hash is only written to S3 after both images
+      // are stored — preventing a partial upload from being incorrectly skipped
+      // on retry (if body.png with metadata uploaded but face.png failed).
+      await store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       const bodyMetadata = avatarHash ? { 'avatar-hash': avatarHash } : undefined
-      await Promise.all([
-        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png', bodyMetadata),
-        store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
-      ])
+      await store(`${prefix}/entities/${entity}/body.png`, body, 'image/png', bodyMetadata)
       return true
     } catch (err) {
       status = 'error'
