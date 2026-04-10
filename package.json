@@ -9,7 +9,7 @@
     "lint:check": "eslint '**/*.{js,ts}'",
     "lint:fix": "eslint '**/*.{js,ts}' --fix",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
-    "setup:localstack": "docker compose down -v && docker compose up -d localstack --wait && bash scripts/init-aws.sh",
+    "setup:localstack": "docker compose down -v && docker compose up -d localstack --wait",
     "pretest": "yarn setup:localstack",
     "test": "jest --forceExit --detectOpenHandles --coverage --verbose",
     "test:unit": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",

@@ -18,7 +18,7 @@ import * as os from 'os'
  */
 describe('when verifying avatar hash storage and retrieval via S3 metadata', () => {
   const ENTITY_ID = 'integration-test-avatar-hash'
-  const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT || 'http://localhost:4566'
+  const LOCALSTACK_ENDPOINT = process.env.AWS_ENDPOINT || 'http://127.0.0.1:4566'
 
   let storage: IStorageComponent
   let s3: S3Client

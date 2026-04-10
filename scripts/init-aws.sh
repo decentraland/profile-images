@@ -17,7 +17,7 @@ BUCKET_NAME="profile-images-bucket"
 if command -v awslocal &> /dev/null; then
     AWS_CMD="awslocal"
 else
-    ENDPOINT="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+    ENDPOINT="${AWS_ENDPOINT_URL:-http://127.0.0.1:4566}"
     AWS_CMD="aws --endpoint-url ${ENDPOINT}"
 fi
 
