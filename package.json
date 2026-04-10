@@ -9,11 +9,11 @@
     "lint:check": "eslint '**/*.{js,ts}'",
     "lint:fix": "eslint '**/*.{js,ts}' --fix",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
-    "test": "yarn test:unit && yarn test:integration",
+    "setup:localstack": "docker compose down -v && docker compose up -d localstack --wait",
+    "pretest": "yarn setup:localstack",
+    "test": "jest --forceExit --detectOpenHandles --coverage --verbose",
     "test:unit": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",
-    "pretest:integration": "docker compose down && docker compose up -d localstack --wait",
-    "test:integration": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration",
-    "test:coverage": "yarn test:unit --coverage && yarn test:integration --coverage"
+    "test:integration": "yarn setup:localstack && jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration"
   },
   "license": "Apache-2.0",
   "dependencies": {
