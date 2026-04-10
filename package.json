@@ -11,8 +11,9 @@
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
     "test": "yarn test:unit && yarn test:integration",
     "test:unit": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",
-    "pretest:integration": "docker compose up -d localstack --wait",
-    "test:integration": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration"
+    "pretest:integration": "curl -sf http://localhost:4566/_localstack/health > /dev/null 2>&1 || (docker compose down && docker compose up -d localstack --wait)",
+    "test:integration": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration",
+    "test:coverage": "yarn test:unit --coverage && yarn test:integration --coverage"
   },
   "license": "Apache-2.0",
   "dependencies": {
