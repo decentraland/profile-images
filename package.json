@@ -12,7 +12,7 @@
     "test": "yarn test:unit && yarn test:integration",
     "test:unit": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/unit",
     "pretest:integration": "docker compose up -d localstack --wait",
-    "test:integration": "yarn setup:localstack && jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration"
+    "test:integration": "jest --forceExit --detectOpenHandles --verbose --testPathPattern=test/integration"
   },
   "license": "Apache-2.0",
   "dependencies": {
