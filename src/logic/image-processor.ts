@@ -1,5 +1,6 @@
 import { Entity } from '@dcl/schemas'
 import { AppComponents, ExtendedAvatar } from '../types'
+import { computeAvatarHash } from '../utils/avatar-comparison'
 
 export type ProcessingResult = ExtendedAvatar & {
   success: boolean
@@ -37,13 +38,62 @@ export async function createImageProcessor({
       avatar: metadata.avatars[0].avatar
     }))
 
-    const { avatars: results, output: outputGenerated } = await godot.generateImages(avatars)
+    // Compute hashes for all incoming avatars and fetch stored hashes in parallel
+    const incomingHashes = new Map(avatars.map((a) => [a.entity, computeAvatarHash(a.avatar)]))
 
-    return Promise.all(
+    const storedHashes = await Promise.all(
+      avatars.map(async ({ entity }) => ({
+        entity,
+        hash: await storage.retrieveAvatarHash(entity)
+      }))
+    )
+
+    const storedByEntity = new Map(storedHashes.map(({ entity, hash }) => [entity, hash]))
+
+    // Partition entities: those that need rendering vs those that can be skipped
+    const needsRender: ExtendedAvatar[] = []
+    const skipped: ExtendedAvatar[] = []
+
+    for (const extAvatar of avatars) {
+      const storedHash = storedByEntity.get(extAvatar.entity)
+      const incomingHash = incomingHashes.get(extAvatar.entity)
+      if (storedHash && storedHash === incomingHash) {
+        skipped.push(extAvatar)
+      } else {
+        needsRender.push(extAvatar)
+      }
+    }
+
+    // Build synthetic success results for skipped entities
+    const skippedResults: ProcessingResult[] = skipped.map((extAvatar) => {
+      metrics.increment('snapshot_generation_count', { status: 'skipped' }, 1)
+      logger.debug(`Skipping image generation for entity=${extAvatar.entity}: avatar unchanged`)
+      return {
+        entity: extAvatar.entity,
+        success: true,
+        shouldRetry: false,
+        avatar: extAvatar.avatar
+      }
+    })
+
+    // If no entities need rendering, return early
+    if (needsRender.length === 0) {
+      return skippedResults
+    }
+
+    const { avatars: results, output: outputGenerated } = await godot.generateImages(needsRender)
+
+    const renderedResults = await Promise.all(
       results.map(async (result) => {
         if (result.success) {
           metrics.increment('snapshot_generation_count', { status: 'success' }, 1)
-          const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath)
+          const hash = incomingHashes.get(result.entity)
+          if (!hash) {
+            logger.warn(
+              `No precomputed avatar hash for entity=${result.entity} — image will be stored without change-detection metadata`
+            )
+          }
+          const success = await storage.storeImages(result.entity, result.avatarPath, result.facePath, hash)
 
           if (!success) {
             logger.error(`Error saving generated images to s3 for entity=${result.entity}`)
@@ -76,7 +126,7 @@ export async function createImageProcessor({
 
         metrics.increment('snapshot_generation_count', { status: 'failure' }, 1)
 
-        if (entities.length === 1) {
+        if (needsRender.length === 1) {
           logger.debug(`Giving up on entity=${result.entity} because of godot failure.`)
           const failure = {
             timestamp: new Date().toISOString(),
@@ -106,6 +156,27 @@ export async function createImageProcessor({
         }
       })
     )
+
+    // Merge rendered results with skipped results, preserving original entity order
+    const resultByEntity = new Map<string, ProcessingResult>()
+    for (const r of [...renderedResults, ...skippedResults]) {
+      resultByEntity.set(r.entity, r)
+    }
+
+    return entities.map(({ id, metadata }) => {
+      const result = resultByEntity.get(id)
+      if (!result) {
+        logger.error(`No processing result for entity=${id} — Godot returned fewer results than expected`)
+        return {
+          entity: id,
+          success: false,
+          shouldRetry: true,
+          error: 'Missing processing result',
+          avatar: metadata.avatars[0].avatar
+        }
+      }
+      return result
+    })
   }
 
   return {

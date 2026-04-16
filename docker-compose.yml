@@ -1,7 +1,7 @@
 services:
   localstack:
     container_name: localstack
-    image: localstack/localstack
+    image: localstack/localstack:4.12.0
     ports:
       - '0.0.0.0:4566:4566' # LocalStack Gateway
       - '0.0.0.0:4510-4559:4510-4559' # external services port range
@@ -10,8 +10,6 @@ services:
       - DEBUG=${DEBUG:-0}
       - SERVICES=sqs,sns,s3
     volumes:
-      - './localstack:/var/lib/localstack'
-      - '/var/run/docker.sock:/var/run/docker.sock'
       - './scripts/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh'
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']

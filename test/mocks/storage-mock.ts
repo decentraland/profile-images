@@ -7,6 +7,7 @@ export async function createInMemoryStorage({
   logs
 }: Pick<AppComponents, 'config' | 'logs'>): Promise<IStorageComponent> {
   const storage: Map<string, Uint8Array> = new Map()
+  const metadata: Map<string, Record<string, string>> = new Map()
   const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
 
   const logger = logs.getLogger('in-memory-storage')
@@ -16,13 +17,22 @@ export async function createInMemoryStorage({
     storage.set(key, new Uint8Array(content.buffer))
   }
 
-  async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
+  async function storeImages(
+    entity: string,
+    avatarPath: string,
+    facePath: string,
+    avatarHash?: string
+  ): Promise<boolean> {
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
+      const bodyKey = `${prefix}/entities/${entity}/body.png`
       await Promise.all([
-        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
+        store(bodyKey, body, 'image/png'),
         store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
       ])
+      if (avatarHash) {
+        metadata.set(bodyKey, { 'avatar-hash': avatarHash })
+      }
       return true
     } catch (err) {
       logger.debug(`Error uploading images to bucket, marking job for retrying it: "${entity}"`)
@@ -52,11 +62,18 @@ export async function createInMemoryStorage({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
+  async function retrieveAvatarHash(entity: string): Promise<string | undefined> {
+    const key = `${prefix}/entities/${entity}/body.png`
+    const meta = metadata.get(key)
+    return meta?.['avatar-hash']
+  }
+
   return {
     storeImages,
     storeFailure,
     deleteFailures,
     retrieveLastCheckedTimestamp,
-    storeLastCheckedTimestamp
+    storeLastCheckedTimestamp,
+    retrieveAvatarHash
   }
 }
