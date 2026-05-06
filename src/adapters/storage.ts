@@ -1,14 +1,15 @@
 import fs from 'fs/promises'
-import { DeleteObjectsCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { AppComponents } from '../types'
 
 export type IStorageComponent = {
-  storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean>
+  storeImages(entity: string, avatarPath: string, facePath: string, avatarHash?: string): Promise<boolean>
   storeFailure(entity: string, failure: string): Promise<void>
   deleteFailures(entities: string[]): Promise<void>
   retrieveLastCheckedTimestamp(): Promise<undefined | number>
   storeLastCheckedTimestamp(ts: number): Promise<void>
+  retrieveAvatarHash(entity: string): Promise<string | undefined>
 }
 
 const LAST_CHECKED_TIMESTAMP_KEY = 'last_checked_timestamp.txt'
@@ -24,28 +25,42 @@ export async function createStorageComponent({
   const bucket = await config.requireString('BUCKET_NAME')
   const prefix = (await config.getString('S3_IMAGES_PREFIX')) || ''
 
-  async function store(key: string, content: Buffer, contentType: string): Promise<void> {
+  async function store(
+    key: string,
+    content: Buffer,
+    contentType: string,
+    metadata?: Record<string, string>
+  ): Promise<void> {
     const upload = new Upload({
       client: s3,
       params: {
         Bucket: bucket,
         Key: `${key}`,
         Body: content,
-        ContentType: contentType
+        ContentType: contentType,
+        ...(metadata && { Metadata: metadata })
       }
     })
     await upload.done()
   }
 
-  async function storeImages(entity: string, avatarPath: string, facePath: string): Promise<boolean> {
+  async function storeImages(
+    entity: string,
+    avatarPath: string,
+    facePath: string,
+    avatarHash?: string
+  ): Promise<boolean> {
     const timer = metrics.startTimer('image_upload_duration_seconds')
     let status = 'success'
     try {
       const [body, face] = await Promise.all([fs.readFile(avatarPath), fs.readFile(facePath)])
-      await Promise.all([
-        store(`${prefix}/entities/${entity}/body.png`, body, 'image/png'),
-        store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
-      ])
+      // Upload face first, then body with avatar-hash metadata.
+      // This ordering ensures the hash is only written to S3 after both images
+      // are stored — preventing a partial upload from being incorrectly skipped
+      // on retry (if body.png with metadata uploaded but face.png failed).
+      await store(`${prefix}/entities/${entity}/face.png`, face, 'image/png')
+      const bodyMetadata = avatarHash ? { 'avatar-hash': avatarHash } : undefined
+      await store(`${prefix}/entities/${entity}/body.png`, body, 'image/png', bodyMetadata)
       return true
     } catch (err) {
       status = 'error'
@@ -96,11 +111,29 @@ export async function createStorageComponent({
     await store(LAST_CHECKED_TIMESTAMP_KEY, Buffer.from(ts.toString()), 'text/plain')
   }
 
+  async function retrieveAvatarHash(entity: string): Promise<string | undefined> {
+    const command = new HeadObjectCommand({
+      Bucket: bucket,
+      Key: `${prefix}/entities/${entity}/body.png`
+    })
+    try {
+      const output = await s3.send(command)
+      return output.Metadata?.['avatar-hash']
+    } catch (e: any) {
+      if (e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404) {
+        return undefined
+      }
+      logger.warn(`Error retrieving avatar hash for entity=${entity}, falling back to re-render: ${e.message}`)
+      return undefined
+    }
+  }
+
   return {
     storeImages,
     storeFailure,
     deleteFailures,
     retrieveLastCheckedTimestamp,
-    storeLastCheckedTimestamp
+    storeLastCheckedTimestamp,
+    retrieveAvatarHash
   }
 }
