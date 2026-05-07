@@ -181,10 +181,15 @@ export async function createGodotSnapshotComponent({
 
     const [previousTopData, previousDiskUsage] = await Promise.all([getTopData(), getDiskUsage()])
 
+    const runNumber = executionNumber + 1
+    logger.info(`disk pre  run=${runNumber}: ${await diskSnapshot()}`)
+
     logger.debug(`Running godot to process ${payloads.length} avatars`)
     const start = Date.now()
     const { error, stdout, stderr } = await runGodot(input)
     const duration = Date.now() - start
+
+    logger.info(`disk post run=${runNumber}: ${await diskSnapshot()}`)
 
     metrics.observe('snapshot_generation_duration_seconds', {}, duration / payloads.length / 1000)
     logger.log(`screenshots for ${payloads.length} entities: ${duration} ms`)
@@ -244,6 +249,23 @@ function getDiskUsage(): Promise<string> {
         reject(error)
       }
       resolve(stdout)
+    })
+  })
+}
+
+// @returns one-line disk snapshot, e.g.:
+// "df=2.4G/20G(12%) /tmp=12K /app=180M /root=890M /var/log=4M"
+function diskSnapshot(): Promise<string> {
+  const cmd =
+    `df=$(df -h / 2>/dev/null | awk 'NR==2 {print $3"/"$2"("$5")"}'); ` +
+    `tmp=$(du -shx /tmp 2>/dev/null | awk '{print $1}'); ` +
+    `app=$(du -shx /app 2>/dev/null | awk '{print $1}'); ` +
+    `root=$(du -shx /root 2>/dev/null | awk '{print $1}'); ` +
+    `varlog=$(du -shx /var/log 2>/dev/null | awk '{print $1}'); ` +
+    `echo "df=$df /tmp=$tmp /app=$app /root=$root /var/log=$varlog"`
+  return new Promise<string>((resolve) => {
+    exec(cmd, { timeout: 5_000 }, (_error, stdout) => {
+      resolve((stdout || '').trim())
     })
   })
 }
