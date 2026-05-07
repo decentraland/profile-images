@@ -97,11 +97,22 @@ export async function createGodotSnapshotComponent({
 
       let resolved = false
 
+      // Removes the temp avatar payload file. Without this, files accumulate on
+      // each run and exhaust the Fargate 20 GiB ephemeral storage after ~2h.
+      const cleanupTempFile = () =>
+        rm(avatarDataPath, { force: true }).catch((err) =>
+          logger.error('Failed to remove temp avatar file', {
+            path: avatarDataPath,
+            message: (err as Error).message
+          })
+        )
+
       // Set a failsafe timeout that will kill the process group if the command hasn't finished.
-      const timeoutHandler: NodeJS.Timeout = setTimeout(() => {
+      const timeoutHandler: NodeJS.Timeout = setTimeout(async () => {
         killProcessGroup(childProcessPid)
         if (!resolved) {
           resolved = true
+          await cleanupTempFile()
           resolve({ error: true, stdout: '', stderr: 'timeout' })
         }
       }, timeout + 5000)
@@ -110,7 +121,7 @@ export async function createGodotSnapshotComponent({
       const childProcess = exec(
         command,
         { timeout } as any,
-        (error: ExecException | null, stdout: string, stderr: string) => {
+        async (error: ExecException | null, stdout: string, stderr: string) => {
           if (resolved) return
           clearTimeout(timeoutHandler)
           if (error) {
@@ -118,9 +129,11 @@ export async function createGodotSnapshotComponent({
               rm(f).catch(logger.error)
             }
             resolved = true
+            await cleanupTempFile()
             return resolve({ error: true, stdout, stderr })
           }
           resolved = true
+          await cleanupTempFile()
           resolve({ error: false, stdout, stderr })
         }
       )
