@@ -29,18 +29,39 @@ const height = 512
 const faceWidth = 256
 const faceHeight = 256
 
+// Derive the godot-explorer `dclenv` value from the configured peer URL.
+// The renderer's wearable fetcher reads `urls::peer_content()`, which is
+// keyed off a global `dclenv` (default: `org`). Pointing PEER_URL at .zone
+// fixes the profile fetch but NOT the `entities/active` POST for wearables
+// — we must also pass `--dclenv` so `set_dcl_environment` runs before the
+// first wearable lookup. See decentraland/godot-explorer/docs/PROFILE_IMAGE.md.
+export function inferDclEnvFromPeerUrl(peerUrl: string): 'org' | 'zone' | 'today' {
+  let host = ''
+  try {
+    host = new URL(peerUrl).hostname.toLowerCase()
+  } catch {
+    return 'org'
+  }
+  if (host === 'peer-testing.decentraland.org') return 'today'
+  if (host.endsWith('.decentraland.zone')) return 'zone'
+  return 'org'
+}
+
 export async function createGodotSnapshotComponent({
   logs,
   metrics,
   config
 }: Pick<AppComponents, 'logs' | 'metrics' | 'config'>): Promise<GodotComponent> {
   const peerUrl = await config.requireString('PEER_URL')
+  const dclenv = inferDclEnvFromPeerUrl(peerUrl)
   const logger = logs.getLogger('godot-snapshot')
   const explorerPath = process.env.EXPLORER_PATH || '.'
   const godotEditorFileName = 'decentraland.godot.client.x86_64'
   const godotEditorPath = `${explorerPath}/${godotEditorFileName}`
   const baseTime = (await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000
   const timePerAvatar = (await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000
+
+  logger.info(`godot snapshot configured with peerUrl=${peerUrl} dclenv=${dclenv}`)
 
   let executionNumber = 0
 
@@ -90,7 +111,8 @@ export async function createGodotSnapshotComponent({
       await writeFile(avatarDataPath, JSON.stringify(input))
 
       await mkdir(outputPath, { recursive: true })
-      const command = `${godotEditorPath} --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
+      const dclenvFlag = dclenv !== 'org' ? ` --dclenv ${dclenv}` : ''
+      const command = `${godotEditorPath} --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}${dclenvFlag}`
       logger.debug(
         `about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}, timeout: ${timeout}`
       )

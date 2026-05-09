@@ -2,7 +2,7 @@ import { createTestMetricsComponent } from '@well-known-components/metrics'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
 import { ExtendedAvatar } from '../../../src/types'
-import { createGodotSnapshotComponent, GodotComponent } from '../../../src/adapters/godot'
+import { createGodotSnapshotComponent, GodotComponent, inferDclEnvFromPeerUrl } from '../../../src/adapters/godot'
 import { metricDeclarations } from '../../../src/metrics'
 import { exec } from 'child_process'
 import { stat, writeFile, mkdir, rm } from 'fs/promises'
@@ -125,6 +125,116 @@ describe('when generating images with Godot', () => {
       expect(result.avatars).toHaveLength(2)
       expect(result.avatars[0].success).toBe(true)
       expect(result.avatars[1].success).toBe(true)
+    })
+  })
+
+  describe('and PEER_URL targets a zone catalyst', () => {
+    let zoneGodot: GodotComponent
+
+    beforeEach(async () => {
+      const zoneConfig = createConfigComponent(
+        {
+          PEER_URL: 'https://peer.decentraland.zone',
+          GODOT_BASE_TIMEOUT: '1000',
+          GODOT_AVATAR_TIMEOUT: '1000'
+        },
+        {}
+      )
+      zoneGodot = await createGodotSnapshotComponent({ logs, metrics, config: zoneConfig })
+      mockExec.mockImplementation((...args) => {
+        const callback = args.find((arg) => typeof arg === 'function')
+        callback(null, 'success', '')
+        return mockChildProcess
+      })
+      ;(stat as jest.Mock).mockResolvedValue({})
+    })
+
+    it('passes --dclenv zone to the godot binary', async () => {
+      await zoneGodot.generateImages(testAvatars)
+      const godotCall = mockExec.mock.calls.find(
+        ([cmd]: [string]) => typeof cmd === 'string' && cmd.includes('decentraland.godot.client')
+      )
+      expect(godotCall).toBeDefined()
+      expect(godotCall![0]).toContain('--dclenv zone')
+    })
+  })
+
+  describe('and PEER_URL targets the peer-testing catalyst', () => {
+    let todayGodot: GodotComponent
+
+    beforeEach(async () => {
+      const todayConfig = createConfigComponent(
+        {
+          PEER_URL: 'https://peer-testing.decentraland.org',
+          GODOT_BASE_TIMEOUT: '1000',
+          GODOT_AVATAR_TIMEOUT: '1000'
+        },
+        {}
+      )
+      todayGodot = await createGodotSnapshotComponent({ logs, metrics, config: todayConfig })
+      mockExec.mockImplementation((...args) => {
+        const callback = args.find((arg) => typeof arg === 'function')
+        callback(null, 'success', '')
+        return mockChildProcess
+      })
+      ;(stat as jest.Mock).mockResolvedValue({})
+    })
+
+    it('passes --dclenv today to the godot binary', async () => {
+      await todayGodot.generateImages(testAvatars)
+      const godotCall = mockExec.mock.calls.find(
+        ([cmd]: [string]) => typeof cmd === 'string' && cmd.includes('decentraland.godot.client')
+      )
+      expect(godotCall).toBeDefined()
+      expect(godotCall![0]).toContain('--dclenv today')
+    })
+  })
+
+  describe('and PEER_URL targets the org catalyst', () => {
+    let orgGodot: GodotComponent
+
+    beforeEach(async () => {
+      const orgConfig = createConfigComponent(
+        {
+          PEER_URL: 'https://peer.decentraland.org',
+          GODOT_BASE_TIMEOUT: '1000',
+          GODOT_AVATAR_TIMEOUT: '1000'
+        },
+        {}
+      )
+      orgGodot = await createGodotSnapshotComponent({ logs, metrics, config: orgConfig })
+      mockExec.mockImplementation((...args) => {
+        const callback = args.find((arg) => typeof arg === 'function')
+        callback(null, 'success', '')
+        return mockChildProcess
+      })
+      ;(stat as jest.Mock).mockResolvedValue({})
+    })
+
+    it('does not pass --dclenv', async () => {
+      await orgGodot.generateImages(testAvatars)
+      const godotCall = mockExec.mock.calls.find(
+        ([cmd]: [string]) => typeof cmd === 'string' && cmd.includes('decentraland.godot.client')
+      )
+      expect(godotCall).toBeDefined()
+      expect(godotCall![0]).not.toContain('--dclenv')
+    })
+  })
+
+  describe('inferDclEnvFromPeerUrl', () => {
+    it('returns zone for *.decentraland.zone hosts', () => {
+      expect(inferDclEnvFromPeerUrl('https://peer.decentraland.zone')).toBe('zone')
+      expect(inferDclEnvFromPeerUrl('https://peer-ap1.decentraland.zone')).toBe('zone')
+    })
+
+    it('returns today for the peer-testing host', () => {
+      expect(inferDclEnvFromPeerUrl('https://peer-testing.decentraland.org')).toBe('today')
+    })
+
+    it('returns org for production hosts and unknown values', () => {
+      expect(inferDclEnvFromPeerUrl('https://peer.decentraland.org')).toBe('org')
+      expect(inferDclEnvFromPeerUrl('http://localhost:3000')).toBe('org')
+      expect(inferDclEnvFromPeerUrl('not a url')).toBe('org')
     })
   })
 
