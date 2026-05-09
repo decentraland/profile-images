@@ -1,4 +1,4 @@
-FROM quay.io/decentraland/godot-explorer:8ed31d84089cba0d4c37243ed48160ad6cd6f6ff
+FROM quay.io/decentraland/godot-explorer:be6db73f926425785932d9b6aa8b97c43beafb91
 
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y ca-certificates tini
