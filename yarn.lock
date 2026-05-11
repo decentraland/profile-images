@@ -1391,20 +1391,20 @@
     "@well-known-components/interfaces" "^1.4.3"
     node-fetch "^2.7.0"
 
-"@dcl/schemas@^11.5.0":
-  version "11.12.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-11.12.0.tgz#f52493b615ebdea8e02819bc2ed4a456239f3747"
-  integrity sha512-L04KTucvxSnrHDAl3/rnkzhjfZ785dSSPeKarBVfzyuw41uyQ0Mh4HVFWjX9hC+f/nMpM5Adg5udlT5efmepcA==
+"@dcl/schemas@^16.8.0", "@dcl/schemas@^16.9.0":
+  version "16.13.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.13.0.tgz#c44259271b5e7d45110e893f2f114ce0fd1b67fc"
+  integrity sha512-Wcu2tHomUX83bsv6HSbnGKKWypkZUVGGjgtB7MImJbdzccB2FgKzvi47fLADgLjZave4lymFIm/oldWTgtEtzA==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
     ajv-keywords "^5.1.0"
     mitt "^3.0.1"
 
-"@dcl/schemas@^16.8.0", "@dcl/schemas@^16.9.0":
-  version "16.13.0"
-  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-16.13.0.tgz#c44259271b5e7d45110e893f2f114ce0fd1b67fc"
-  integrity sha512-Wcu2tHomUX83bsv6HSbnGKKWypkZUVGGjgtB7MImJbdzccB2FgKzvi47fLADgLjZave4lymFIm/oldWTgtEtzA==
+"@dcl/schemas@^23.0.0":
+  version "23.1.0"
+  resolved "https://registry.yarnpkg.com/@dcl/schemas/-/schemas-23.1.0.tgz#e9c87c74fc5589d821425f41e0fe1896575b1189"
+  integrity sha512-2+Sp4OrUKyGxEe1nLMuLtEmNwLThGUDei0QqXzurkQMkhQdJvB1viS4UW86Wia7AelmCzBewSLU6to8CgQ8UEw==
   dependencies:
     ajv "^8.11.0"
     ajv-errors "^3.0.0"
@@ -3368,15 +3368,15 @@ cross-spawn@^7.0.2, cross-spawn@^7.0.3:
     shebang-command "^2.0.0"
     which "^2.0.1"
 
-dcl-catalyst-client@^21.10.2:
-  version "21.10.2"
-  resolved "https://registry.yarnpkg.com/dcl-catalyst-client/-/dcl-catalyst-client-21.10.2.tgz#d1bdc71ed33f3728f897016dc0b2d9adac573d7e"
-  integrity sha512-1WDb/63KAsvGLiyT2F9rimzWfbAXkNTgdIFrnlqqYhCdcNxmI3EeaMdgBbUkuY5sBAZamRajqxk2eFCgysIQnA==
+dcl-catalyst-client@^21.10.3:
+  version "21.10.3"
+  resolved "https://registry.yarnpkg.com/dcl-catalyst-client/-/dcl-catalyst-client-21.10.3.tgz#c3eaf6edf712314f1aaf77f5d0e5a4d9b807a9aa"
+  integrity sha512-P3j+oSNwezqIN/MZtz0Ii8dmd5bTxziBqR2ifq4ZMydf016+MLSCwkexFZhz9wZ5eW0PN/bEOAcx4Rhx+xTcwg==
   dependencies:
     "@dcl/catalyst-contracts" "^4.4.0"
     "@dcl/crypto" "^3.4.0"
     "@dcl/hashing" "^3.0.0"
-    "@dcl/schemas" "^11.5.0"
+    "@dcl/schemas" "^23.0.0"
     "@well-known-components/fetch-component" "^2.0.0"
     cookie "^0.5.0"
     cross-fetch "^3.1.5"
