@@ -32,12 +32,12 @@ test('when scheduling processing', function ({ components, stubComponents }) {
         }
       }
 
-      entityFetcher.getEntitiesByIds.onFirstCall().resolves([mockEntity])
+      entityFetcher.getEntitiesByIds.mockResolvedValueOnce([mockEntity])
     })
 
     afterEach(() => {
-      stubComponents.entityFetcher.getEntitiesByIds.reset()
-      stubComponents.imageProcessor.processEntities.reset()
+      stubComponents.entityFetcher.getEntitiesByIds.mockReset()
+      stubComponents.imageProcessor.processEntities.mockReset()
     })
 
     describe('and the processing succeeds', () => {
@@ -51,7 +51,7 @@ test('when scheduling processing', function ({ components, stubComponents }) {
           avatar: mockEntity.metadata.avatars[0].avatar
         }
 
-        imageProcessor.processEntities.onFirstCall().resolves([mockProcessingResult])
+        imageProcessor.processEntities.mockResolvedValueOnce([mockProcessingResult])
       })
 
       it('should respond with success', async () => {
@@ -89,7 +89,7 @@ test('when scheduling processing', function ({ components, stubComponents }) {
           avatar: mockEntity.metadata.avatars[0].avatar
         }
 
-        imageProcessor.processEntities.onFirstCall().resolves([mockProcessingResult])
+        imageProcessor.processEntities.mockResolvedValueOnce([mockProcessingResult])
       })
 
       it('should respond with processing failure', async () => {

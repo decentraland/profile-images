@@ -1,7 +1,7 @@
 import { createStorageComponent, IStorageComponent } from '../../src/adapters/storage'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { metricDeclarations } from '../../src/metrics'
 import { computeAvatarHash } from '../../src/utils/avatar-comparison'
 import { AvatarInfo } from '@dcl/schemas'
