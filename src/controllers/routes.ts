@@ -1,8 +1,8 @@
-import { Router } from '@well-known-components/http-server'
+import { Router } from '@dcl/http-server'
 import { GlobalContext } from '../types'
 import { statusHandler } from './handlers/status-handler'
 import { scheduleProcessingHandler } from './handlers/set-schedule-processing-handler'
-import { bearerTokenMiddleware, errorHandler } from '@dcl/platform-server-commons'
+import { bearerTokenMiddleware, errorHandler } from '@dcl/http-commons'
 
 export async function setupRouter(globalContext: GlobalContext): Promise<Router<GlobalContext>> {
   const router = new Router<GlobalContext>()

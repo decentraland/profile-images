@@ -1,7 +1,7 @@
 import { createConsumerComponent, MESSAGE_SYSTEM_ATTRIBUTE_NAMES } from '../../../src/adapters/consumer'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { Message } from '@aws-sdk/client-sqs'
 import { ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
 import { CatalystDeploymentEvent, Entity, EntityType, Events } from '@dcl/schemas'

@@ -3,7 +3,8 @@ import { Entity, EntityType } from '@dcl/schemas'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import * as catalystClient from 'dcl-catalyst-client'
 import * as contractSnapshots from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { IConfigComponent, IFetchComponent } from '@well-known-components/interfaces'
+import { IConfigComponent } from '@well-known-components/interfaces'
+import { IFetchComponent } from '@dcl/core-commons'
 import { ContentClient } from 'dcl-catalyst-client'
 
 jest.mock('dcl-catalyst-client')

@@ -1,11 +1,10 @@
 import type {
   IBaseComponent,
   IConfigComponent,
-  IFetchComponent,
-  IHttpServerComponent,
   ILoggerComponent,
   IMetricsComponent
 } from '@well-known-components/interfaces'
+import type { IFetchComponent, IHttpServerComponent } from '@dcl/core-commons'
 import { metricDeclarations } from './metrics'
 import { GodotComponent } from './adapters/godot'
 import { AvatarInfo } from '@dcl/schemas'

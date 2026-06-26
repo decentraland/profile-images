@@ -1,15 +1,15 @@
 // This file is the "test-environment" analogous for src/components.ts
 // Here we define the test components to be used in the testing environment
 
-import { createLocalFetchCompoment, createRunner } from '@well-known-components/test-helpers'
+import { createLocalFetchComponent, createRunner } from '@dcl/test-helpers'
 
 import { main } from '../src/service'
 import { QueueWorker, TestComponents } from '../src/types'
 import { initComponents as originalInitComponents } from '../src/components'
-import { createTestMetricsComponent } from '@well-known-components/metrics'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { metricDeclarations } from '../src/metrics'
 import { IStorageComponent } from '../src/adapters/storage'
-import { IFetchComponent } from '@well-known-components/interfaces'
+import { IFetchComponent } from '@dcl/core-commons'
 import { SqsClient } from '../src/adapters/sqs'
 import { createInMemorySqs } from './mocks/sqs-mock'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
@@ -77,7 +77,7 @@ async function initComponents(): Promise<TestComponents> {
 
   return {
     ...components,
-    localFetch: await createLocalFetchCompoment(config),
+    localFetch: await createLocalFetchComponent(config),
     consumer,
     fetch,
     metrics,

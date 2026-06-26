@@ -4,7 +4,7 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y ca-certificates tini
 
 # Install node
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x  | bash - && apt-get -y install nodejs
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x  | bash - && apt-get -y install nodejs
 
 # Clean apt cache
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*

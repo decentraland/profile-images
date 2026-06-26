@@ -3,16 +3,16 @@ import {
   createServerComponent,
   createStatusCheckComponent,
   instrumentHttpServerWithPromClientRegistry
-} from '@well-known-components/http-server'
+} from '@dcl/http-server'
 import { createLogComponent } from '@well-known-components/logger'
-import { createMetricsComponent } from '@well-known-components/metrics'
+import { createMetricsComponent } from '@dcl/metrics'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createConsumerComponent } from './adapters/consumer'
 import { createStorageComponent } from './adapters/storage'
 import { createGodotSnapshotComponent } from './adapters/godot'
 import { createSQSClient } from './adapters/sqs'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createFetchComponent } from '@dcl/fetch-component'
 import { createAwsConfig } from './adapters/aws-config'
 import { createEntityFetcher } from './adapters/entity-fetcher'
 import { createImageProcessor } from './logic/image-processor'

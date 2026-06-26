@@ -1,5 +1,5 @@
 import { HandlerContextWithPath, StatusResponse } from '../../types'
-import { IHttpServerComponent } from '@well-known-components/interfaces'
+import { IHttpServerComponent } from '@dcl/core-commons'
 
 export async function statusHandler(
   context: HandlerContextWithPath<'config' | 'mainQueue' | 'dlQueue', '/status'>

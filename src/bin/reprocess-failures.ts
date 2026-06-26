@@ -1,6 +1,7 @@
 import { _Object, ListObjectsV2Command, ListObjectsV2Request, S3Client } from '@aws-sdk/client-s3'
 import { createDotEnvConfigComponent } from '@well-known-components/env-config-provider'
-import { createFetchComponent } from '@well-known-components/fetch-component'
+import { createFetchComponent } from '@dcl/fetch-component'
+import { drainResponse } from '../utils/drain-response'
 
 const REGION = 'us-east-1'
 
@@ -43,6 +44,7 @@ async function main() {
       })
 
       console.log(response.status)
+      await drainResponse(response)
     }
 
     params.ContinuationToken = fetched.NextContinuationToken
