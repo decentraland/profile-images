@@ -5,6 +5,7 @@ export const createQueueMock = ({
   sendMessage = jest.fn(),
   deleteMessage = jest.fn(),
   deleteMessages = jest.fn(),
+  extendVisibility = jest.fn(),
   getStatus = jest.fn().mockReturnValue({ isProcessing: false })
 }: Partial<jest.Mocked<QueueComponent>> = {}): jest.Mocked<QueueComponent> => {
   return {
@@ -12,6 +13,7 @@ export const createQueueMock = ({
     sendMessage,
     deleteMessage,
     deleteMessages,
+    extendVisibility,
     getStatus
   }
 }

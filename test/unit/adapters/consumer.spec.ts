@@ -326,6 +326,29 @@ describe('when processing messages', () => {
           )
         })
       })
+
+      describe('and the processed entity has malformed pointers', () => {
+        beforeEach(() => {
+          const malformedEntity = { ...entity, pointers: 'not-an-array' as any }
+          const standardizedEvent = createStandardizedEvent('1', { ...entity, metadata: {}, pointers: ['0xevent'] })
+
+          messageValidatorMock.validateMessages.mockReturnValue({
+            validMessages: [{ message, event: standardizedEvent }],
+            invalidMessages: []
+          })
+          entityFetcherMock.getEntitiesByIds.mockResolvedValue([malformedEntity])
+          imageProcessorMock.processEntities.mockResolvedValue([
+            { entity: entity.id, success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          ])
+        })
+
+        it('should not throw and should fall back to the event pointers', async () => {
+          await consumer.processMessages(mainQueueMock, [message])
+
+          expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+          expect(messageValidatorMock.markPointerProcessed).toHaveBeenCalledWith('0xevent', entity.timestamp)
+        })
+      })
     })
 
     describe('and processing fails with shouldRetry true', () => {
