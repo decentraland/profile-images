@@ -155,7 +155,11 @@ export async function createConsumerComponent({
       logger.debug(`SQS message publication to image generation duration: ${durationInSeconds}s`)
     }
 
-    const pointers = processedEntity?.pointers ?? event.entity.pointers ?? []
+    const pointers = Array.isArray(processedEntity?.pointers)
+      ? processedEntity.pointers
+      : Array.isArray(event.entity.pointers)
+        ? event.entity.pointers
+        : []
     const entityTimestamp = processedEntity?.timestamp ?? event.entity.timestamp ?? 0
     for (const pointer of pointers) {
       if (typeof pointer === 'string') {

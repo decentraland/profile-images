@@ -2,12 +2,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
-export type ValidationError =
-  | 'undefined_body'
-  | 'invalid_json'
-  | 'invalid_entity_type'
-  | 'duplicate_entity'
-  | 'recently_processed_pointer'
+export type ValidationError = 'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'recently_processed_pointer'
 
 export type MessagesValidationResult = {
   validMessages: Array<{
@@ -25,7 +20,7 @@ export type MessageValidator = {
   markPointerProcessed: (pointer: string, entityTimestamp: number) => void
 }
 
-const DEFAULT_POINTER_DEDUP_WINDOW_SECONDS = 60
+const DEFAULT_POINTER_DEDUP_WINDOW_SECONDS = 300
 
 export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): MessageValidator {
   const logger = logs.getLogger('message-validator')
@@ -40,7 +35,18 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
   }
 
   function markPointerProcessed(pointer: string, entityTimestamp: number) {
-    recentlyProcessedPointers.set(pointer.toLowerCase(), { entityTimestamp, processedAt: Date.now() })
+    if (entityTimestamp <= 0) return
+
+    const normalizedPointer = pointer.toLowerCase()
+    const existing = recentlyProcessedPointers.get(normalizedPointer)
+    const timestamp = Math.max(entityTimestamp, existing?.entityTimestamp ?? 0)
+
+    recentlyProcessedPointers.set(normalizedPointer, { entityTimestamp: timestamp, processedAt: Date.now() })
+  }
+
+  function getEntityTimestamp(entity: any): number {
+    const timestamp = entity?.timestamp ?? entity?.entityTimestamp
+    return typeof timestamp === 'number' ? timestamp : 0
   }
 
   function validateMessages(messages: Message[]): MessagesValidationResult {
@@ -49,10 +55,12 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
 
     const validMessages: MessagesValidationResult['validMessages'] = []
     const invalidMessages: MessagesValidationResult['invalidMessages'] = []
-    const processedEntityIds = new Set<string>()
-    // Maps pointer → index in validMessages so we can replace older entries
-    // with newer ones when the same wallet appears multiple times in a batch.
-    const batchPointerIndex = new Map<string, number>()
+    const candidateMessages: Array<{
+      message: Message
+      event: CatalystDeploymentEvent
+      pointer: string
+      timestamp: number
+    }> = []
 
     for (const message of messages) {
       if (!message.Body) {
@@ -74,7 +82,13 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         continue
       }
 
-      if (!event.entity || typeof event.entity !== 'object' || !event.entity.entityId) {
+      if (
+        !event ||
+        typeof event !== 'object' ||
+        !event.entity ||
+        typeof event.entity !== 'object' ||
+        !event.entity.entityId
+      ) {
         logger.warn(
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
         )
@@ -92,15 +106,7 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         continue
       }
 
-      if (processedEntityIds.has(entityId)) {
-        logger.warn(
-          `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with duplicate entity: ${entityId}`
-        )
-        invalidMessages.push({ message, error: 'duplicate_entity' })
-        continue
-      }
-
-      processedEntityIds.add(entityId)
+      const entityTimestamp = getEntityTimestamp(event.entity)
 
       const standardEvent: CatalystDeploymentEvent = {
         type: Events.Type.CATALYST_DEPLOYMENT,
@@ -112,7 +118,7 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
           type: EntityType.PROFILE,
           version: event.entity?.version || 'v3',
           pointers: event.entity?.pointers,
-          timestamp: event.entity?.timestamp || event.entity?.entityTimestamp,
+          timestamp: entityTimestamp,
           content: event.entity?.content || [],
           metadata: event.entity?.metadata
         },
@@ -126,31 +132,52 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
       if (pointer) {
         const lastProcessed = recentlyProcessedPointers.get(pointer)
         if (lastProcessed !== undefined) {
-          const incomingTs = standardEvent.entity.timestamp ?? standardEvent.timestamp ?? 0
-          if (incomingTs > 0 && incomingTs <= lastProcessed.entityTimestamp) {
+          if (entityTimestamp > 0 && entityTimestamp <= lastProcessed.entityTimestamp) {
             logger.debug(`Suppressing stale message for pointer ${pointer}, entity=${entityId}`)
             invalidMessages.push({ message, error: 'recently_processed_pointer' })
             continue
           }
         }
-
-        const existingIndex = batchPointerIndex.get(pointer)
-        if (existingIndex !== undefined) {
-          const existing = validMessages[existingIndex]
-          const existingTs = existing.event.entity.timestamp ?? existing.event.timestamp ?? 0
-          const newTs = standardEvent.entity.timestamp ?? standardEvent.timestamp ?? 0
-          if (newTs > 0 && existingTs > 0 && newTs !== existingTs) {
-            if (newTs > existingTs) {
-              validMessages[existingIndex] = { message, event: standardEvent }
-            }
-            continue
-          }
-        }
-
-        batchPointerIndex.set(pointer, validMessages.length)
       }
 
-      validMessages.push({ message, event: standardEvent })
+      candidateMessages.push({
+        message,
+        event: standardEvent,
+        pointer,
+        timestamp: entityTimestamp
+      })
+    }
+
+    const maxTimestampByPointer = new Map<string, number>()
+    const maxTimestampByEntity = new Map<string, number>()
+    for (const { event, pointer, timestamp } of candidateMessages) {
+      if (timestamp <= 0) continue
+      maxTimestampByEntity.set(event.entity.id, Math.max(maxTimestampByEntity.get(event.entity.id) ?? 0, timestamp))
+      if (pointer) {
+        maxTimestampByPointer.set(pointer, Math.max(maxTimestampByPointer.get(pointer) ?? 0, timestamp))
+      }
+    }
+
+    const acceptedEntityIds = new Set<string>()
+    for (const candidate of candidateMessages) {
+      const maxPointerTimestamp = candidate.pointer ? (maxTimestampByPointer.get(candidate.pointer) ?? 0) : 0
+      const maxEntityTimestamp = maxTimestampByEntity.get(candidate.event.entity.id) ?? 0
+      const isStaleByPointer =
+        candidate.timestamp > 0 && maxPointerTimestamp > 0 && candidate.timestamp < maxPointerTimestamp
+      const isStaleByEntity =
+        candidate.timestamp > 0 && maxEntityTimestamp > 0 && candidate.timestamp < maxEntityTimestamp
+
+      if (isStaleByPointer || isStaleByEntity || acceptedEntityIds.has(candidate.event.entity.id)) {
+        // Leave same-batch stale/duplicate messages invisible instead of returning them as invalid.
+        // They should only be deleted after a newer render succeeds and cross-batch dedup can prove they are stale.
+        logger.debug(
+          `Leaving stale or duplicate same-batch message in queue for pointer ${candidate.pointer}, entity=${candidate.event.entity.id}`
+        )
+        continue
+      }
+
+      acceptedEntityIds.add(candidate.event.entity.id)
+      validMessages.push({ message: candidate.message, event: candidate.event })
     }
 
     return { validMessages, invalidMessages }
