@@ -22,32 +22,25 @@ export type MessagesValidationResult = {
 
 export type MessageValidator = {
   validateMessages: (messages: Message[]) => MessagesValidationResult
-  // Mark a wallet pointer as successfully processed so subsequent messages for
-  // the same wallet are suppressed within the dedup window.
-  markPointerProcessed: (pointer: string) => void
+  markPointerProcessed: (pointer: string, entityTimestamp: number) => void
 }
 
-// Default dedup window: suppress re-renders for the same wallet for this many
-// seconds after a successful render. Covers the worst-case SQS visibility
-// timeout and prevents redundant renders from high-frequency deployments.
 const DEFAULT_POINTER_DEDUP_WINDOW_SECONDS = 60
 
 export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): MessageValidator {
   const logger = logs.getLogger('message-validator')
 
-  // Tracks when each wallet pointer was last successfully processed.
-  // Entries are pruned lazily on each validateMessages call.
-  const recentlyProcessedPointers = new Map<string, number>()
+  const recentlyProcessedPointers = new Map<string, { entityTimestamp: number; processedAt: number }>()
 
   function pruneExpiredPointers(windowMs: number) {
     const cutoff = Date.now() - windowMs
-    for (const [pointer, ts] of recentlyProcessedPointers) {
-      if (ts < cutoff) recentlyProcessedPointers.delete(pointer)
+    for (const [pointer, entry] of recentlyProcessedPointers) {
+      if (entry.processedAt < cutoff) recentlyProcessedPointers.delete(pointer)
     }
   }
 
-  function markPointerProcessed(pointer: string) {
-    recentlyProcessedPointers.set(pointer.toLowerCase(), Date.now())
+  function markPointerProcessed(pointer: string, entityTimestamp: number) {
+    recentlyProcessedPointers.set(pointer.toLowerCase(), { entityTimestamp, processedAt: Date.now() })
   }
 
   function validateMessages(messages: Message[]): MessagesValidationResult {
@@ -132,11 +125,13 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
 
       if (pointer) {
         const lastProcessed = recentlyProcessedPointers.get(pointer)
-        const isRecentlySeen = lastProcessed !== undefined && Date.now() - lastProcessed < windowMs
-        if (isRecentlySeen) {
-          logger.debug(`Suppressing message for recently-processed pointer ${pointer}, entity=${entityId}`)
-          invalidMessages.push({ message, error: 'recently_processed_pointer' })
-          continue
+        if (lastProcessed !== undefined) {
+          const incomingTs = standardEvent.entity.timestamp ?? standardEvent.timestamp ?? 0
+          if (incomingTs > 0 && incomingTs <= lastProcessed.entityTimestamp) {
+            logger.debug(`Suppressing stale message for pointer ${pointer}, entity=${entityId}`)
+            invalidMessages.push({ message, error: 'recently_processed_pointer' })
+            continue
+          }
         }
 
         const existingIndex = batchPointerIndex.get(pointer)
@@ -144,13 +139,12 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
           const existing = validMessages[existingIndex]
           const existingTs = existing.event.entity.timestamp ?? existing.event.timestamp ?? 0
           const newTs = standardEvent.entity.timestamp ?? standardEvent.timestamp ?? 0
-          if (newTs > existingTs) {
-            invalidMessages.push({ message: existing.message, error: 'recently_processed_pointer' })
-            validMessages[existingIndex] = { message, event: standardEvent }
-          } else {
-            invalidMessages.push({ message, error: 'recently_processed_pointer' })
+          if (newTs > 0 && existingTs > 0 && newTs !== existingTs) {
+            if (newTs > existingTs) {
+              validMessages[existingIndex] = { message, event: standardEvent }
+            }
+            continue
           }
-          continue
         }
 
         batchPointerIndex.set(pointer, validMessages.length)

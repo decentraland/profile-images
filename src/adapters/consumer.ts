@@ -156,9 +156,10 @@ export async function createConsumerComponent({
     }
 
     const pointers = processedEntity?.pointers ?? event.entity.pointers ?? []
+    const entityTimestamp = processedEntity?.timestamp ?? event.entity.timestamp ?? 0
     for (const pointer of pointers) {
       if (typeof pointer === 'string') {
-        messageValidator.markPointerProcessed(pointer)
+        messageValidator.markPointerProcessed(pointer, entityTimestamp)
       }
     }
   }

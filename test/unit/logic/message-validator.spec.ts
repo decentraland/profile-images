@@ -286,7 +286,7 @@ describe('when validating messages', () => {
   })
 
   describe('and multiple messages share the same pointer in a batch', () => {
-    it('should keep the newest message and drop the older one', () => {
+    it('should keep the newest message and leave the older one in SQS for redelivery', () => {
       const messages: Message[] = [
         {
           MessageId: '1',
@@ -317,9 +317,7 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(1)
       expect(result.validMessages[0].event.entity.id).toBe('entity_new')
-      expect(result.invalidMessages).toHaveLength(1)
-      expect(result.invalidMessages[0].message.MessageId).toBe('1')
-      expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+      expect(result.invalidMessages).toHaveLength(0)
     })
 
     it('should keep the first message when it is newer than subsequent ones', () => {
@@ -353,8 +351,71 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(1)
       expect(result.validMessages[0].event.entity.id).toBe('entity_new')
-      expect(result.invalidMessages).toHaveLength(1)
-      expect(result.invalidMessages[0].message.MessageId).toBe('2')
+      expect(result.invalidMessages).toHaveLength(0)
+    })
+
+    it('should keep both messages when timestamps are equal', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_a',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        },
+        {
+          MessageId: '2',
+          ReceiptHandle: 'receipt2',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_b',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(2)
+      expect(result.invalidMessages).toHaveLength(0)
+    })
+
+    it('should keep both messages when timestamps are missing', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_a',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet']
+            }
+          })
+        },
+        {
+          MessageId: '2',
+          ReceiptHandle: 'receipt2',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_b',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet']
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(2)
+      expect(result.invalidMessages).toHaveLength(0)
     })
 
     it('should handle pointer case-insensitively', () => {
@@ -392,8 +453,8 @@ describe('when validating messages', () => {
   })
 
   describe('and a pointer was recently processed cross-batch', () => {
-    it('should suppress the message', () => {
-      validator.markPointerProcessed('0xwallet')
+    it('should suppress stale messages with older entity timestamp', () => {
+      validator.markPointerProcessed('0xwallet', 2000)
 
       const messages: Message[] = [
         {
@@ -414,6 +475,51 @@ describe('when validating messages', () => {
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
       expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+    })
+
+    it('should allow newer messages with higher entity timestamp', () => {
+      validator.markPointerProcessed('0xwallet', 1000)
+
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 2000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.invalidMessages).toHaveLength(0)
+    })
+
+    it('should allow messages when incoming timestamp is missing', () => {
+      validator.markPointerProcessed('0xwallet', 2000)
+
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet']
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.invalidMessages).toHaveLength(0)
     })
   })
 })
