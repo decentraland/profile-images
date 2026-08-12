@@ -3,11 +3,7 @@ import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
 export type ValidationError =
-  | 'undefined_body'
-  | 'invalid_json'
-  | 'invalid_entity_type'
-  | 'duplicate_entity'
-  | 'recently_processed_pointer'
+  'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'duplicate_entity' | 'recently_processed_pointer'
 
 export type MessagesValidationResult = {
   validMessages: Array<{
@@ -117,9 +113,7 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         const lastProcessed = recentlyProcessedPointers.get(pointer)
         const isRecentlySeen = lastProcessed !== undefined && Date.now() - lastProcessed < windowMs
         if (isRecentlySeen || batchPointers.has(pointer)) {
-          logger.debug(
-            `Suppressing message for recently-processed pointer ${pointer}, entity=${entityId}`
-          )
+          logger.debug(`Suppressing message for recently-processed pointer ${pointer}, entity=${entityId}`)
           invalidMessages.push({ message, error: 'recently_processed_pointer' })
           continue
         }

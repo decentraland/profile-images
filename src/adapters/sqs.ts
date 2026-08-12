@@ -47,7 +47,9 @@ export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsCon
     return client.send(payload)
   }
 
-  function changeMessageVisibility(payload: ChangeMessageVisibilityCommand): Promise<ChangeMessageVisibilityCommandOutput> {
+  function changeMessageVisibility(
+    payload: ChangeMessageVisibilityCommand
+  ): Promise<ChangeMessageVisibilityCommandOutput> {
     return client.send(payload)
   }
 

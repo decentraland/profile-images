@@ -1,5 +1,7 @@
 import { SqsClient } from '../../src/adapters/sqs'
 import {
+  ChangeMessageVisibilityCommand,
+  ChangeMessageVisibilityCommandOutput,
   DeleteMessageBatchCommand,
   DeleteMessageBatchCommandOutput,
   DeleteMessageCommand,
@@ -70,5 +72,13 @@ export function createInMemorySqs(): SqsClient {
     })
   }
 
-  return { sendMessage, getQueueAttributes, receiveMessages, deleteMessage, deleteMessages }
+  function changeMessageVisibility(
+    _payload: ChangeMessageVisibilityCommand
+  ): Promise<ChangeMessageVisibilityCommandOutput> {
+    return Promise.resolve({
+      $metadata: {}
+    })
+  }
+
+  return { sendMessage, getQueueAttributes, receiveMessages, deleteMessage, deleteMessages, changeMessageVisibility }
 }
