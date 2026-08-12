@@ -1,4 +1,5 @@
 import {
+  ChangeMessageVisibilityCommand,
   DeleteMessageBatchCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
@@ -11,11 +12,17 @@ import { CatalystDeploymentEvent } from '@dcl/schemas'
 import { AppComponents } from '../types'
 import { chunks } from '../utils/array'
 
+// Godot render timeout is 15s base + 10s per avatar, so 10 avatars = 115s.
+// Default visibility timeout must exceed the worst-case render cycle to prevent
+// duplicate redelivery under load, which causes wasted renders and backlog growth.
+const DEFAULT_VISIBILITY_TIMEOUT_SECONDS = 300
+
 export type QueueComponent = {
   sendMessage(message: CatalystDeploymentEvent): Promise<void>
   receiveMessage(options: ReceiveMessageOptions): Promise<Message[]>
   deleteMessage(receiptHandle: string): Promise<void>
   deleteMessages(receiptHandles: string[]): Promise<void>
+  extendVisibility(receiptHandle: string, visibilityTimeoutSeconds: number): Promise<void>
   getStatus(): Promise<{
     ApproximateNumberOfMessages: string
     ApproximateNumberOfMessagesNotVisible: string
@@ -41,13 +48,22 @@ export async function createQueueComponent(
     const receiveCommand = new ReceiveMessageCommand({
       QueueUrl: queueUrl,
       MaxNumberOfMessages: maxNumberOfMessages,
-      VisibilityTimeout: visibilityTimeout || 60,
+      VisibilityTimeout: visibilityTimeout ?? DEFAULT_VISIBILITY_TIMEOUT_SECONDS,
       WaitTimeSeconds: waitTimeSeconds || 20,
       MessageSystemAttributeNames: messageSystemAttributeNames
     })
     const { Messages = [] } = await sqsClient.receiveMessages(receiveCommand)
 
     return Messages
+  }
+
+  async function extendVisibility(receiptHandle: string, visibilityTimeoutSeconds: number): Promise<void> {
+    const command = new ChangeMessageVisibilityCommand({
+      QueueUrl: queueUrl,
+      ReceiptHandle: receiptHandle,
+      VisibilityTimeout: visibilityTimeoutSeconds
+    })
+    await sqsClient.changeMessageVisibility(command)
   }
 
   async function deleteMessage(receiptHandle: string) {
@@ -96,6 +112,7 @@ export async function createQueueComponent(
     receiveMessage,
     deleteMessage,
     deleteMessages,
+    extendVisibility,
     getStatus
   }
 }

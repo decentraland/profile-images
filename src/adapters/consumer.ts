@@ -148,6 +148,12 @@ export async function createConsumerComponent({
       metrics.observe('sqs_message_publication_to_image_generation_duration_seconds', {}, durationInSeconds)
       logger.debug(`SQS message publication to image generation duration: ${durationInSeconds}s`)
     }
+
+    // Mark each wallet pointer as recently processed so subsequent queue messages
+    // for the same wallet are suppressed within the dedup window.
+    for (const pointer of event.entity.pointers ?? []) {
+      messageValidator.markPointerProcessed(pointer)
+    }
   }
 
   function handleFailure(message: Message, queue: QueueComponent, result: ProcessingResult) {

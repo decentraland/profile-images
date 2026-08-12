@@ -4,9 +4,11 @@ export const createMessageValidatorMock = ({
   validateMessages = jest.fn().mockReturnValue({
     validMessages: [],
     invalidMessages: []
-  })
+  }),
+  markPointerProcessed = jest.fn()
 }: Partial<jest.Mocked<MessageValidator>> = {}): jest.Mocked<MessageValidator> => {
   return {
-    validateMessages
+    validateMessages,
+    markPointerProcessed
   }
 }

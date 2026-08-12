@@ -1,4 +1,6 @@
 import {
+  ChangeMessageVisibilityCommand,
+  ChangeMessageVisibilityCommandOutput,
   DeleteMessageBatchCommand,
   DeleteMessageBatchCommandOutput,
   DeleteMessageCommand,
@@ -19,6 +21,7 @@ export type SqsClient = {
   receiveMessages(payload: ReceiveMessageCommand): Promise<ReceiveMessageCommandOutput>
   deleteMessage(payload: DeleteMessageCommand): Promise<DeleteMessageCommandOutput>
   deleteMessages(payload: DeleteMessageBatchCommand): Promise<DeleteMessageBatchCommandOutput>
+  changeMessageVisibility(payload: ChangeMessageVisibilityCommand): Promise<ChangeMessageVisibilityCommandOutput>
 }
 
 export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsConfig'>): Promise<SqsClient> {
@@ -44,11 +47,16 @@ export async function createSQSClient({ awsConfig }: Pick<AppComponents, 'awsCon
     return client.send(payload)
   }
 
+  function changeMessageVisibility(payload: ChangeMessageVisibilityCommand): Promise<ChangeMessageVisibilityCommandOutput> {
+    return client.send(payload)
+  }
+
   return {
     sendMessage,
     getQueueAttributes,
     receiveMessages,
     deleteMessage,
-    deleteMessages
+    deleteMessages,
+    changeMessageVisibility
   }
 }

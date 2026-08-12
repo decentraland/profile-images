@@ -7,7 +7,8 @@ describe('when using queue component', () => {
     receiveMessages: jest.fn(),
     deleteMessage: jest.fn(),
     deleteMessages: jest.fn(),
-    getQueueAttributes: jest.fn()
+    getQueueAttributes: jest.fn(),
+    changeMessageVisibility: jest.fn()
   }
   let queue: QueueComponent
 
@@ -75,7 +76,7 @@ describe('when using queue component', () => {
             input: {
               QueueUrl: 'test-queue',
               MaxNumberOfMessages: 2,
-              VisibilityTimeout: 60,
+              VisibilityTimeout: 300,
               WaitTimeSeconds: 20
             }
           })
