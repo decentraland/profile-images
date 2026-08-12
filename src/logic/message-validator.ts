@@ -3,7 +3,11 @@ import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
 export type ValidationError =
-  'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'duplicate_entity' | 'recently_processed_pointer'
+  | 'undefined_body'
+  | 'invalid_json'
+  | 'invalid_entity_type'
+  | 'duplicate_entity'
+  | 'recently_processed_pointer'
 
 export type MessagesValidationResult = {
   validMessages: Array<{
