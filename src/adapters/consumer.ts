@@ -114,6 +114,7 @@ export async function createConsumerComponent({
     logger.debug(`Processed ${results.length} entities`)
 
     const messageByEntity = new Map(validMessages.map(({ message, event }) => [event.entity.id, { message, event }]))
+    const entityById = new Map(allEntities.map((e) => [e.id, e]))
     const messagesToDelete = []
 
     for (const result of results) {
@@ -126,7 +127,7 @@ export async function createConsumerComponent({
       }
 
       if (result.success) {
-        handleSuccess(event, queue, result)
+        handleSuccess(event, queue, result, entityById.get(result.entity))
       } else {
         handleFailure(message, queue, result)
       }
@@ -139,7 +140,12 @@ export async function createConsumerComponent({
     }
   }
 
-  function handleSuccess(event: CatalystDeploymentEvent, queue: QueueComponent, result: ProcessingResult) {
+  function handleSuccess(
+    event: CatalystDeploymentEvent,
+    queue: QueueComponent,
+    result: ProcessingResult,
+    processedEntity?: Entity
+  ) {
     const queueName = isDLQ(queue) ? 'DLQ' : 'main'
     logger.info(`Successfully processed message from ${queueName} for entity ${result.entity}`)
 
@@ -149,10 +155,11 @@ export async function createConsumerComponent({
       logger.debug(`SQS message publication to image generation duration: ${durationInSeconds}s`)
     }
 
-    // Mark each wallet pointer as recently processed so subsequent queue messages
-    // for the same wallet are suppressed within the dedup window.
-    for (const pointer of event.entity.pointers ?? []) {
-      messageValidator.markPointerProcessed(pointer)
+    const pointers = processedEntity?.pointers ?? event.entity.pointers ?? []
+    for (const pointer of pointers) {
+      if (typeof pointer === 'string') {
+        messageValidator.markPointerProcessed(pointer)
+      }
     }
   }
 

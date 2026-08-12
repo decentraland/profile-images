@@ -242,4 +242,178 @@ describe('when validating messages', () => {
       expect(validMessage.event.entity.metadata.avatars).toHaveLength(1)
     })
   })
+
+  describe('and messages have malformed pointers', () => {
+    it('should not throw when pointers contain non-string values', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: [123]
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.invalidMessages).toHaveLength(0)
+    })
+
+    it('should not throw when pointers is not an array', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: 'not-an-array'
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.invalidMessages).toHaveLength(0)
+    })
+  })
+
+  describe('and multiple messages share the same pointer in a batch', () => {
+    it('should keep the newest message and drop the older one', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_old',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        },
+        {
+          MessageId: '2',
+          ReceiptHandle: 'receipt2',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_new',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 2000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.validMessages[0].event.entity.id).toBe('entity_new')
+      expect(result.invalidMessages).toHaveLength(1)
+      expect(result.invalidMessages[0].message.MessageId).toBe('1')
+      expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+    })
+
+    it('should keep the first message when it is newer than subsequent ones', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_new',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 2000
+            }
+          })
+        },
+        {
+          MessageId: '2',
+          ReceiptHandle: 'receipt2',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_old',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.validMessages[0].event.entity.id).toBe('entity_new')
+      expect(result.invalidMessages).toHaveLength(1)
+      expect(result.invalidMessages[0].message.MessageId).toBe('2')
+    })
+
+    it('should handle pointer case-insensitively', () => {
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_old',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xWALLET'],
+              timestamp: 1000
+            }
+          })
+        },
+        {
+          MessageId: '2',
+          ReceiptHandle: 'receipt2',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_new',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 2000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(1)
+      expect(result.validMessages[0].event.entity.id).toBe('entity_new')
+    })
+  })
+
+  describe('and a pointer was recently processed cross-batch', () => {
+    it('should suppress the message', () => {
+      validator.markPointerProcessed('0xwallet')
+
+      const messages: Message[] = [
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        }
+      ]
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(0)
+      expect(result.invalidMessages).toHaveLength(1)
+      expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+    })
+  })
 })

@@ -56,12 +56,10 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
 
     const validMessages: MessagesValidationResult['validMessages'] = []
     const invalidMessages: MessagesValidationResult['invalidMessages'] = []
-    // Within-batch dedup: reject if the same entityId appears more than once
-    // in a single SQS poll batch.
     const processedEntityIds = new Set<string>()
-    // Within-batch pointer dedup: only the first entity per pointer is accepted
-    // when multiple entities for the same wallet arrive in the same batch.
-    const batchPointers = new Set<string>()
+    // Maps pointer → index in validMessages so we can replace older entries
+    // with newer ones when the same wallet appears multiple times in a batch.
+    const batchPointerIndex = new Map<string, number>()
 
     for (const message of messages) {
       if (!message.Body) {
@@ -109,21 +107,6 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
         continue
       }
 
-      // Cross-batch and within-batch pointer dedup: suppress any entity whose
-      // wallet pointer was rendered recently or already appears in this batch.
-      // Uses the first pointer as the canonical wallet identifier.
-      const pointer = (event.entity?.pointers?.[0] ?? '').toLowerCase()
-      if (pointer) {
-        const lastProcessed = recentlyProcessedPointers.get(pointer)
-        const isRecentlySeen = lastProcessed !== undefined && Date.now() - lastProcessed < windowMs
-        if (isRecentlySeen || batchPointers.has(pointer)) {
-          logger.debug(`Suppressing message for recently-processed pointer ${pointer}, entity=${entityId}`)
-          invalidMessages.push({ message, error: 'recently_processed_pointer' })
-          continue
-        }
-        batchPointers.add(pointer)
-      }
-
       processedEntityIds.add(entityId)
 
       const standardEvent: CatalystDeploymentEvent = {
@@ -141,6 +124,36 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
           metadata: event.entity?.metadata
         },
         authChain: event.entity?.authChain || []
+      }
+
+      const rawPointers = event.entity?.pointers
+      const rawPointer = Array.isArray(rawPointers) ? rawPointers[0] : undefined
+      const pointer = typeof rawPointer === 'string' ? rawPointer.toLowerCase() : ''
+
+      if (pointer) {
+        const lastProcessed = recentlyProcessedPointers.get(pointer)
+        const isRecentlySeen = lastProcessed !== undefined && Date.now() - lastProcessed < windowMs
+        if (isRecentlySeen) {
+          logger.debug(`Suppressing message for recently-processed pointer ${pointer}, entity=${entityId}`)
+          invalidMessages.push({ message, error: 'recently_processed_pointer' })
+          continue
+        }
+
+        const existingIndex = batchPointerIndex.get(pointer)
+        if (existingIndex !== undefined) {
+          const existing = validMessages[existingIndex]
+          const existingTs = existing.event.entity.timestamp ?? existing.event.timestamp ?? 0
+          const newTs = standardEvent.entity.timestamp ?? standardEvent.timestamp ?? 0
+          if (newTs > existingTs) {
+            invalidMessages.push({ message: existing.message, error: 'recently_processed_pointer' })
+            validMessages[existingIndex] = { message, event: standardEvent }
+          } else {
+            invalidMessages.push({ message, error: 'recently_processed_pointer' })
+          }
+          continue
+        }
+
+        batchPointerIndex.set(pointer, validMessages.length)
       }
 
       validMessages.push({ message, event: standardEvent })
