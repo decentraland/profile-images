@@ -206,6 +206,42 @@ describe('when processing messages', () => {
         const expectedTimeout = Math.ceil(15 + 10 * 1 + 120)
         expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(message.ReceiptHandle, expectedTimeout)
       })
+
+      it('should keep extending visibility while processing is still running', async () => {
+        jest.useFakeTimers()
+        let resolveProcessing!: (value: any) => void
+        imageProcessorMock.processEntities.mockReturnValue(
+          new Promise((resolve) => {
+            resolveProcessing = resolve
+          })
+        )
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await Promise.resolve()
+          await Promise.resolve()
+          await Promise.resolve()
+
+          expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+          expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(1)
+
+          jest.advanceTimersByTime(73_000)
+          await Promise.resolve()
+
+          expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+          expect(mainQueueMock.extendVisibility).toHaveBeenLastCalledWith(
+            message.ReceiptHandle,
+            Math.ceil(15 + 10 + 120)
+          )
+
+          resolveProcessing([
+            { entity: '1', success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          ])
+          await processPromise
+        } finally {
+          jest.useRealTimers()
+        }
+      })
     })
 
     describe('and visibility extension fails', () => {
@@ -223,11 +259,11 @@ describe('when processing messages', () => {
         mainQueueMock.extendVisibility.mockRejectedValue(new Error('SQS error'))
       })
 
-      it('should still process entities', async () => {
+      it('should leave messages in the queue and avoid unprotected processing', async () => {
         await consumer.processMessages(mainQueueMock, [message])
 
-        expect(imageProcessorMock.processEntities).toHaveBeenCalled()
-        expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
+        expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+        expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
       })
     })
 

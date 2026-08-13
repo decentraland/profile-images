@@ -116,15 +116,20 @@ export async function createConsumerComponent({
       godotBaseTimeoutSeconds + godotPerAvatarTimeoutSeconds * allEntities.length + visibilityBufferSeconds
     )
     const receiptHandles = validMessages.map(({ message }) => message.ReceiptHandle!).filter(Boolean)
-    await Promise.all(
-      receiptHandles.map((handle) =>
-        queue.extendVisibility(handle, visibilityTimeout).catch((err) => {
-          logger.warn(`Failed to extend visibility for message`, { error: String(err) })
-        })
-      )
-    )
+    const visibilityExtended = await extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
 
-    const results = await imageProcessor.processEntities(allEntities)
+    if (!visibilityExtended) {
+      logger.warn(`Skipping processing because visibility could not be extended for all messages`)
+      return
+    }
+
+    const stopVisibilityHeartbeat = startVisibilityHeartbeat(queue, receiptHandles, visibilityTimeout)
+    let results: ProcessingResult[]
+    try {
+      results = await imageProcessor.processEntities(allEntities)
+    } finally {
+      stopVisibilityHeartbeat()
+    }
 
     logger.debug(`Processed ${results.length} entities`)
 
@@ -153,6 +158,41 @@ export async function createConsumerComponent({
       logger.debug(`Deleting ${messagesToDelete.length} messages from ${queueName} queue`)
       await queue.deleteMessages(messagesToDelete)
     }
+  }
+
+  async function extendVisibilityForAll(
+    queue: QueueComponent,
+    receiptHandles: string[],
+    visibilityTimeout: number
+  ): Promise<boolean> {
+    const extensionResults = await Promise.allSettled(
+      receiptHandles.map((handle) => queue.extendVisibility(handle, visibilityTimeout))
+    )
+    let failedExtensions = 0
+
+    for (const extensionResult of extensionResults) {
+      if (extensionResult.status === 'rejected') {
+        failedExtensions++
+        logger.warn(`Failed to extend visibility for message`, { error: String(extensionResult.reason) })
+      }
+    }
+
+    return failedExtensions === 0
+  }
+
+  function startVisibilityHeartbeat(
+    queue: QueueComponent,
+    receiptHandles: string[],
+    visibilityTimeout: number
+  ): () => void {
+    const heartbeatIntervalMs = Math.max(30, Math.floor(visibilityTimeout / 2)) * 1000
+    const heartbeat = setInterval(() => {
+      void extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
+    }, heartbeatIntervalMs)
+
+    heartbeat.unref?.()
+
+    return () => clearInterval(heartbeat)
   }
 
   function handleSuccess(
