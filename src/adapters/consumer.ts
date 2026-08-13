@@ -27,6 +27,7 @@ export async function createConsumerComponent({
   const godotBaseTimeoutSeconds = ((await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000) / 1000
   const godotPerAvatarTimeoutSeconds = ((await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000) / 1000
   const visibilityBufferSeconds = 120
+  const visibilityExtensionTimeoutMs = 10_000
 
   let isRunning = false
   let processLoopPromise: Promise<void> | null = null
@@ -171,7 +172,13 @@ export async function createConsumerComponent({
     visibilityTimeout: number
   ): Promise<boolean> {
     const extensionResults = await Promise.allSettled(
-      receiptHandles.map((handle) => queue.extendVisibility(handle, visibilityTimeout))
+      receiptHandles.map((handle) =>
+        withTimeout(
+          queue.extendVisibility(handle, visibilityTimeout),
+          visibilityExtensionTimeoutMs,
+          `Timed out extending visibility for message`
+        )
+      )
     )
     let failedExtensions = 0
 
@@ -183,6 +190,15 @@ export async function createConsumerComponent({
     }
 
     return failedExtensions === 0
+  }
+
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    let timeout: NodeJS.Timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
+    })
+
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout))
   }
 
   function startVisibilityHeartbeat(

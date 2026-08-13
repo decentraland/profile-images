@@ -218,15 +218,12 @@ describe('when processing messages', () => {
 
         try {
           const processPromise = consumer.processMessages(mainQueueMock, [message])
-          await Promise.resolve()
-          await Promise.resolve()
-          await Promise.resolve()
+          await jest.advanceTimersByTimeAsync(0)
 
           expect(imageProcessorMock.processEntities).toHaveBeenCalled()
           expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(1)
 
-          jest.advanceTimersByTime(73_000)
-          await Promise.resolve()
+          await jest.advanceTimersByTimeAsync(73_000)
 
           expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
           expect(mainQueueMock.extendVisibility).toHaveBeenLastCalledWith(
@@ -255,15 +252,11 @@ describe('when processing messages', () => {
 
         try {
           const processPromise = consumer.processMessages(mainQueueMock, [message])
-          await Promise.resolve()
-          await Promise.resolve()
-          await Promise.resolve()
+          await jest.advanceTimersByTimeAsync(0)
 
           expect(imageProcessorMock.processEntities).toHaveBeenCalled()
 
-          jest.advanceTimersByTime(73_000)
-          await Promise.resolve()
-          await Promise.resolve()
+          await jest.advanceTimersByTimeAsync(73_000)
 
           resolveProcessing([
             { entity: '1', success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
@@ -297,6 +290,24 @@ describe('when processing messages', () => {
 
         expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
         expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+      })
+
+      it('should time out visibility extension attempts that do not settle', async () => {
+        jest.useFakeTimers()
+        mainQueueMock.extendVisibility.mockReturnValue(new Promise(() => {}))
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await jest.advanceTimersByTimeAsync(0)
+
+          await jest.advanceTimersByTimeAsync(10_000)
+          await processPromise
+
+          expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+          expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        } finally {
+          jest.useRealTimers()
+        }
       })
     })
 
