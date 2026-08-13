@@ -123,12 +123,17 @@ export async function createConsumerComponent({
       return
     }
 
-    const stopVisibilityHeartbeat = startVisibilityHeartbeat(queue, receiptHandles, visibilityTimeout)
+    const visibilityHeartbeat = startVisibilityHeartbeat(queue, receiptHandles, visibilityTimeout)
     let results: ProcessingResult[]
     try {
       results = await imageProcessor.processEntities(allEntities)
     } finally {
-      stopVisibilityHeartbeat()
+      await visibilityHeartbeat.stop()
+    }
+
+    if (visibilityHeartbeat.hasVisibilityBeenLost()) {
+      logger.warn(`Skipping message deletion because visibility was lost while processing`)
+      return
     }
 
     logger.debug(`Processed ${results.length} entities`)
@@ -184,15 +189,35 @@ export async function createConsumerComponent({
     queue: QueueComponent,
     receiptHandles: string[],
     visibilityTimeout: number
-  ): () => void {
+  ): { stop: () => Promise<void>; hasVisibilityBeenLost: () => boolean } {
     const heartbeatIntervalMs = Math.max(30, Math.floor(visibilityTimeout / 2)) * 1000
-    const heartbeat = setInterval(() => {
-      void extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
-    }, heartbeatIntervalMs)
+    const pendingHeartbeats = new Set<Promise<void>>()
+    let visibilityLost = false
 
+    const runHeartbeat = () => {
+      const heartbeatPromise = extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
+        .then((wasExtended) => {
+          if (!wasExtended) {
+            visibilityLost = true
+          }
+        })
+        .finally(() => pendingHeartbeats.delete(heartbeatPromise))
+
+      pendingHeartbeats.add(heartbeatPromise)
+    }
+
+    const heartbeat = setInterval(runHeartbeat, heartbeatIntervalMs)
     heartbeat.unref?.()
 
-    return () => clearInterval(heartbeat)
+    return {
+      async stop() {
+        clearInterval(heartbeat)
+        await Promise.allSettled([...pendingHeartbeats])
+      },
+      hasVisibilityBeenLost() {
+        return visibilityLost
+      }
+    }
   }
 
   function handleSuccess(

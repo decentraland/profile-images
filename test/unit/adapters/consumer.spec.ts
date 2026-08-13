@@ -242,6 +242,39 @@ describe('when processing messages', () => {
           jest.useRealTimers()
         }
       })
+
+      it('should not delete messages if heartbeat visibility extension fails while processing', async () => {
+        jest.useFakeTimers()
+        let resolveProcessing!: (value: any) => void
+        mainQueueMock.extendVisibility.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('SQS error'))
+        imageProcessorMock.processEntities.mockReturnValue(
+          new Promise((resolve) => {
+            resolveProcessing = resolve
+          })
+        )
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await Promise.resolve()
+          await Promise.resolve()
+          await Promise.resolve()
+
+          expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+
+          jest.advanceTimersByTime(73_000)
+          await Promise.resolve()
+          await Promise.resolve()
+
+          resolveProcessing([
+            { entity: '1', success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          ])
+          await processPromise
+
+          expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        } finally {
+          jest.useRealTimers()
+        }
+      })
     })
 
     describe('and visibility extension fails', () => {
