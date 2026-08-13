@@ -1,3 +1,4 @@
+import os from 'os'
 import { createTestMetricsComponent } from '@dcl/metrics'
 import { createConfigComponent } from '@well-known-components/env-config-provider'
 import { createLogComponent } from '@well-known-components/logger'
@@ -75,7 +76,8 @@ describe('when generating images with Godot', () => {
       await godot.generateImages(testAvatars)
 
       const writtenPath = writeFileMock.mock.calls[0][0] as string
-      expect(writtenPath).toMatch(/^temp-avatars-\d+\.json$/)
+      const tmpDir = os.tmpdir()
+      expect(writtenPath).toMatch(new RegExp(`^${tmpDir.replace(/[/\\]/g, '[/\\\\]')}[/\\\\]temp-avatars-\\d+\\.json$`))
       expect(rm).toHaveBeenCalledWith(writtenPath, { force: true })
     })
   })
