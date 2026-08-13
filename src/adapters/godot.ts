@@ -1,3 +1,4 @@
+import os from 'os'
 import path from 'path'
 import { exec, ExecException } from 'child_process'
 import { writeFile } from 'fs/promises'
@@ -44,75 +45,76 @@ export async function createGodotSnapshotComponent({
 
   let executionNumber = 0
 
-  function runGodot(input: GodotInput): Promise<{ error: boolean; stderr: string; stdout: string }> {
-    // Helper: kill all processes whose command line matches the Godot executable.
-    const killProcessTree = () => {
-      // Adjust the match pattern if needed.
-      const pkillCommand = `pkill -9 -f "${godotEditorFileName}"`
-      exec(pkillCommand, (err, _stdout, _stderr) => {
-        if (err) {
-          // pkill returns code 1 if no process was matched; ignore that.
-          if ((err as any).code !== 1) {
-            logger.error('Error executing pkill for godot process tree', {
-              message: (err as Error).message
-            })
-          }
-        }
-      })
-    }
-
-    // Helper: kill the process group and then ensure the entire tree is killed.
-    const killProcessGroup = (childProcessPid: number | undefined) => {
-      if (childProcessPid !== undefined) {
-        try {
-          // Attempt to kill the entire process group.
-          process.kill(-childProcessPid, 'SIGKILL')
-        } catch (e: unknown) {
-          if (e instanceof Error && (e as any).code === 'ESRCH') {
-            // Process group already terminated.
-          } else if (e instanceof Error) {
-            logger.error('Error when killing process group', { message: e.message })
-          } else {
-            logger.error('Error when killing process group', { error: String(e) })
-          }
-        }
-      } else {
-        logger.error('childProcess.pid is undefined; cannot kill process group')
-      }
-      // Additionally, call pkill to catch any stray Godot processes.
-      killProcessTree()
-    }
-
-    return new Promise(async (resolve) => {
-      executionNumber += 1
-      const timeout = baseTime + input.payload.length * timePerAvatar
-      const avatarDataPath = `temp-avatars-${executionNumber}.json`
-      await writeFile(avatarDataPath, JSON.stringify(input))
-
-      await mkdir(outputPath, { recursive: true })
-      const command = `${godotEditorPath} --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
-      logger.debug(
-        `about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}, timeout: ${timeout}`
-      )
-
-      let resolved = false
-
-      // Removes the temp avatar payload file. Without this, files accumulate on
-      // each run and exhaust the Fargate 20 GiB ephemeral storage after ~2h.
-      const cleanupTempFile = () =>
-        rm(avatarDataPath, { force: true }).catch((err) =>
-          logger.error('Failed to remove temp avatar file', {
-            path: avatarDataPath,
+  // Helper: kill all processes whose command line matches the Godot executable.
+  const killProcessTree = () => {
+    // Adjust the match pattern if needed.
+    const pkillCommand = `pkill -9 -f "${godotEditorFileName}"`
+    exec(pkillCommand, (err, _stdout, _stderr) => {
+      if (err) {
+        // pkill returns code 1 if no process was matched; ignore that.
+        if ((err as any).code !== 1) {
+          logger.error('Error executing pkill for godot process tree', {
             message: (err as Error).message
           })
-        )
+        }
+      }
+    })
+  }
+
+  // Helper: kill the process group and then ensure the entire tree is killed.
+  const killProcessGroup = (childProcessPid: number | undefined) => {
+    if (childProcessPid !== undefined) {
+      try {
+        // Attempt to kill the entire process group.
+        process.kill(-childProcessPid, 'SIGKILL')
+      } catch (e: unknown) {
+        if (e instanceof Error && (e as any).code === 'ESRCH') {
+          // Process group already terminated.
+        } else if (e instanceof Error) {
+          logger.error('Error when killing process group', { message: e.message })
+        } else {
+          logger.error('Error when killing process group', { error: String(e) })
+        }
+      }
+    } else {
+      logger.error('childProcess.pid is undefined; cannot kill process group')
+    }
+    // Additionally, call pkill to catch any stray Godot processes.
+    killProcessTree()
+  }
+
+  async function runGodot(input: GodotInput): Promise<{ error: boolean; stderr: string; stdout: string }> {
+    executionNumber += 1
+    const timeout = baseTime + input.payload.length * timePerAvatar
+    const avatarDataPath = path.join(os.tmpdir(), `temp-avatars-${executionNumber}.json`)
+    await writeFile(avatarDataPath, JSON.stringify(input))
+
+    await mkdir(outputPath, { recursive: true })
+    const command = `${godotEditorPath} --rendering-driver opengl3 --avatar-renderer --avatars ${avatarDataPath}`
+    logger.debug(
+      `about to exec: explorerPath: ${explorerPath}, display: ${process.env.DISPLAY}, command: ${command}, timeout: ${timeout}`
+    )
+
+    // Removes the temp avatar payload file. Without this, files accumulate on
+    // each run and exhaust the Fargate 20 GiB ephemeral storage after ~2h.
+    // Fire-and-forget: errors are caught internally, no need to await.
+    const cleanupTempFile = () =>
+      rm(avatarDataPath, { force: true }).catch((err) =>
+        logger.error('Failed to remove temp avatar file', {
+          path: avatarDataPath,
+          message: (err as Error).message
+        })
+      )
+
+    return new Promise((resolve) => {
+      let resolved = false
 
       // Set a failsafe timeout that will kill the process group if the command hasn't finished.
-      const timeoutHandler: NodeJS.Timeout = setTimeout(async () => {
+      const timeoutHandler: NodeJS.Timeout = setTimeout(() => {
         killProcessGroup(childProcessPid)
         if (!resolved) {
           resolved = true
-          await cleanupTempFile()
+          void cleanupTempFile()
           resolve({ error: true, stdout: '', stderr: 'timeout' })
         }
       }, timeout + 5000)
@@ -121,7 +123,7 @@ export async function createGodotSnapshotComponent({
       const childProcess = exec(
         command,
         { timeout } as any,
-        async (error: ExecException | null, stdout: string, stderr: string) => {
+        (error: ExecException | null, stdout: string, stderr: string) => {
           if (resolved) return
           clearTimeout(timeoutHandler)
           if (error) {
@@ -129,11 +131,11 @@ export async function createGodotSnapshotComponent({
               rm(f).catch(logger.error)
             }
             resolved = true
-            await cleanupTempFile()
+            void cleanupTempFile()
             return resolve({ error: true, stdout, stderr })
           }
           resolved = true
-          await cleanupTempFile()
+          void cleanupTempFile()
           resolve({ error: false, stdout, stderr })
         }
       )
