@@ -24,6 +24,10 @@ export async function createConsumerComponent({
   const logger = logs.getLogger('consumer')
   const isDLQ = (queue: QueueComponent) => queue === dlQueue
   const maxDLQRetries = (await config.getNumber('MAX_DLQ_RETRIES')) || 3
+  const godotBaseTimeoutSeconds = ((await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000) / 1000
+  const godotPerAvatarTimeoutSeconds = ((await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000) / 1000
+  const visibilityBufferSeconds = 120
+  const visibilityExtensionTimeoutMs = 10_000
 
   let isRunning = false
   let processLoopPromise: Promise<void> | null = null
@@ -109,7 +113,29 @@ export async function createConsumerComponent({
       `Got ${allEntities.length} active entities from ${queueName} queue (${entitiesFromMessages.length} from messages, ${entitiesFromFetcher.length} from fetcher)`
     )
 
-    const results = await imageProcessor.processEntities(allEntities)
+    const visibilityTimeout = Math.ceil(
+      godotBaseTimeoutSeconds + godotPerAvatarTimeoutSeconds * allEntities.length + visibilityBufferSeconds
+    )
+    const receiptHandles = validMessages.map(({ message }) => message.ReceiptHandle!).filter(Boolean)
+    const visibilityExtended = await extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
+
+    if (!visibilityExtended) {
+      logger.warn(`Skipping processing because visibility could not be extended for all messages`)
+      return
+    }
+
+    const visibilityHeartbeat = startVisibilityHeartbeat(queue, receiptHandles, visibilityTimeout)
+    let results: ProcessingResult[]
+    try {
+      results = await imageProcessor.processEntities(allEntities)
+    } finally {
+      await visibilityHeartbeat.stop()
+    }
+
+    if (visibilityHeartbeat.hasVisibilityBeenLost()) {
+      logger.warn(`Skipping message deletion because visibility was lost while processing`)
+      return
+    }
 
     logger.debug(`Processed ${results.length} entities`)
 
@@ -137,6 +163,76 @@ export async function createConsumerComponent({
     if (messagesToDelete.length > 0) {
       logger.debug(`Deleting ${messagesToDelete.length} messages from ${queueName} queue`)
       await queue.deleteMessages(messagesToDelete)
+    }
+  }
+
+  async function extendVisibilityForAll(
+    queue: QueueComponent,
+    receiptHandles: string[],
+    visibilityTimeout: number
+  ): Promise<boolean> {
+    const extensionResults = await Promise.allSettled(
+      receiptHandles.map((handle) =>
+        withTimeout(
+          queue.extendVisibility(handle, visibilityTimeout),
+          visibilityExtensionTimeoutMs,
+          `Timed out extending visibility for message`
+        )
+      )
+    )
+    let failedExtensions = 0
+
+    for (const extensionResult of extensionResults) {
+      if (extensionResult.status === 'rejected') {
+        failedExtensions++
+        logger.warn(`Failed to extend visibility for message`, { error: String(extensionResult.reason) })
+      }
+    }
+
+    return failedExtensions === 0
+  }
+
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    let timeout: NodeJS.Timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
+    })
+
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout))
+  }
+
+  function startVisibilityHeartbeat(
+    queue: QueueComponent,
+    receiptHandles: string[],
+    visibilityTimeout: number
+  ): { stop: () => Promise<void>; hasVisibilityBeenLost: () => boolean } {
+    const heartbeatIntervalMs = Math.max(30, Math.floor(visibilityTimeout / 2)) * 1000
+    const pendingHeartbeats = new Set<Promise<void>>()
+    let visibilityLost = false
+
+    const runHeartbeat = () => {
+      const heartbeatPromise = extendVisibilityForAll(queue, receiptHandles, visibilityTimeout)
+        .then((wasExtended) => {
+          if (!wasExtended) {
+            visibilityLost = true
+          }
+        })
+        .finally(() => pendingHeartbeats.delete(heartbeatPromise))
+
+      pendingHeartbeats.add(heartbeatPromise)
+    }
+
+    const heartbeat = setInterval(runHeartbeat, heartbeatIntervalMs)
+    heartbeat.unref?.()
+
+    return {
+      async stop() {
+        clearInterval(heartbeat)
+        await Promise.allSettled([...pendingHeartbeats])
+      },
+      hasVisibilityBeenLost() {
+        return visibilityLost
+      }
     }
   }
 

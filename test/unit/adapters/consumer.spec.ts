@@ -193,6 +193,155 @@ describe('when processing messages', () => {
         ])
         expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([message.ReceiptHandle])
       })
+
+      it('should extend visibility for all valid messages before processing', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(message.ReceiptHandle, expect.any(Number))
+      })
+
+      it('should calculate visibility timeout based on entity count', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        const expectedTimeout = Math.ceil(15 + 10 * 1 + 120)
+        expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(message.ReceiptHandle, expectedTimeout)
+      })
+
+      it('should keep extending visibility while processing is still running', async () => {
+        jest.useFakeTimers()
+        let resolveProcessing!: (value: any) => void
+        imageProcessorMock.processEntities.mockReturnValue(
+          new Promise((resolve) => {
+            resolveProcessing = resolve
+          })
+        )
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await jest.advanceTimersByTimeAsync(0)
+
+          expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+          expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(1)
+
+          await jest.advanceTimersByTimeAsync(73_000)
+
+          expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+          expect(mainQueueMock.extendVisibility).toHaveBeenLastCalledWith(
+            message.ReceiptHandle,
+            Math.ceil(15 + 10 + 120)
+          )
+
+          resolveProcessing([
+            { entity: '1', success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          ])
+          await processPromise
+        } finally {
+          jest.useRealTimers()
+        }
+      })
+
+      it('should not delete messages if heartbeat visibility extension fails while processing', async () => {
+        jest.useFakeTimers()
+        let resolveProcessing!: (value: any) => void
+        mainQueueMock.extendVisibility.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('SQS error'))
+        imageProcessorMock.processEntities.mockReturnValue(
+          new Promise((resolve) => {
+            resolveProcessing = resolve
+          })
+        )
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await jest.advanceTimersByTimeAsync(0)
+
+          expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+
+          await jest.advanceTimersByTimeAsync(73_000)
+
+          resolveProcessing([
+            { entity: '1', success: true, shouldRetry: false, avatar: entity.metadata.avatars[0].avatar }
+          ])
+          await processPromise
+
+          expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        } finally {
+          jest.useRealTimers()
+        }
+      })
+    })
+
+    describe('and visibility extension fails', () => {
+      beforeEach(() => {
+        const completeEntity = createTestEntity('1')
+        const standardizedEvent = createStandardizedEvent('1', completeEntity)
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [{ message, event: standardizedEvent }],
+          invalidMessages: []
+        })
+        imageProcessorMock.processEntities.mockResolvedValue([
+          { entity: '1', success: true, shouldRetry: false, avatar: completeEntity.metadata.avatars[0].avatar }
+        ])
+        mainQueueMock.extendVisibility.mockRejectedValue(new Error('SQS error'))
+      })
+
+      it('should leave messages in the queue and avoid unprotected processing', async () => {
+        await consumer.processMessages(mainQueueMock, [message])
+
+        expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+        expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+      })
+
+      it('should time out visibility extension attempts that do not settle', async () => {
+        jest.useFakeTimers()
+        mainQueueMock.extendVisibility.mockReturnValue(new Promise(() => {}))
+
+        try {
+          const processPromise = consumer.processMessages(mainQueueMock, [message])
+          await jest.advanceTimersByTimeAsync(0)
+
+          await jest.advanceTimersByTimeAsync(10_000)
+          await processPromise
+
+          expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+          expect(mainQueueMock.deleteMessages).not.toHaveBeenCalled()
+        } finally {
+          jest.useRealTimers()
+        }
+      })
+    })
+
+    describe('and multiple entities are processed', () => {
+      let message1: Message
+      let message2: Message
+
+      beforeEach(() => {
+        const entity1 = createTestEntity('1')
+        const entity2 = createTestEntity('2')
+        message1 = createTestMessage('1', { entity: entity1 })
+        message2 = createTestMessage('2', { entity: entity2 })
+
+        messageValidatorMock.validateMessages.mockReturnValue({
+          validMessages: [
+            { message: message1, event: createStandardizedEvent('1', entity1) },
+            { message: message2, event: createStandardizedEvent('2', entity2) }
+          ],
+          invalidMessages: []
+        })
+        imageProcessorMock.processEntities.mockResolvedValue([
+          { entity: '1', success: true, shouldRetry: false, avatar: entity1.metadata.avatars[0].avatar },
+          { entity: '2', success: true, shouldRetry: false, avatar: entity2.metadata.avatars[0].avatar }
+        ])
+      })
+
+      it('should extend visibility for each message with timeout based on total entity count', async () => {
+        await consumer.processMessages(mainQueueMock, [message1, message2])
+
+        const expectedTimeout = Math.ceil(15 + 10 * 2 + 120)
+        expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+        expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(message1.ReceiptHandle, expectedTimeout)
+        expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(message2.ReceiptHandle, expectedTimeout)
+      })
     })
 
     describe('and entities cannot be extracted from messages', () => {
