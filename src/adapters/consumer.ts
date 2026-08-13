@@ -24,6 +24,9 @@ export async function createConsumerComponent({
   const logger = logs.getLogger('consumer')
   const isDLQ = (queue: QueueComponent) => queue === dlQueue
   const maxDLQRetries = (await config.getNumber('MAX_DLQ_RETRIES')) || 3
+  const godotBaseTimeoutSeconds = ((await config.getNumber('GODOT_BASE_TIMEOUT')) || 15_000) / 1000
+  const godotPerAvatarTimeoutSeconds = ((await config.getNumber('GODOT_AVATAR_TIMEOUT')) || 10_000) / 1000
+  const visibilityBufferSeconds = 120
 
   let isRunning = false
   let processLoopPromise: Promise<void> | null = null
@@ -107,6 +110,18 @@ export async function createConsumerComponent({
 
     logger.debug(
       `Got ${allEntities.length} active entities from ${queueName} queue (${entitiesFromMessages.length} from messages, ${entitiesFromFetcher.length} from fetcher)`
+    )
+
+    const visibilityTimeout = Math.ceil(
+      godotBaseTimeoutSeconds + godotPerAvatarTimeoutSeconds * allEntities.length + visibilityBufferSeconds
+    )
+    const receiptHandles = validMessages.map(({ message }) => message.ReceiptHandle!).filter(Boolean)
+    await Promise.all(
+      receiptHandles.map((handle) =>
+        queue.extendVisibility(handle, visibilityTimeout).catch((err) => {
+          logger.warn(`Failed to extend visibility for message`, { error: String(err) })
+        })
+      )
     )
 
     const results = await imageProcessor.processEntities(allEntities)
