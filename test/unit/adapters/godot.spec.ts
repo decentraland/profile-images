@@ -69,6 +69,39 @@ describe('when generating images with Godot', () => {
       expect(mkdir).toHaveBeenCalledWith('output', { recursive: true })
       expect(writeFile).toHaveBeenCalled()
     })
+
+    it('should remove the temp avatar payload file after the run', async () => {
+      const writeFileMock = writeFile as jest.Mock
+      await godot.generateImages(testAvatars)
+
+      const writtenPath = writeFileMock.mock.calls[0][0] as string
+      expect(writtenPath).toMatch(/^temp-avatars-\d+\.json$/)
+      expect(rm).toHaveBeenCalledWith(writtenPath, { force: true })
+    })
+  })
+
+  describe('and process fails with an error', () => {
+    beforeEach(() => {
+      mockExec.mockImplementation((...args) => {
+        const isGodot = args.find((arg) => typeof arg === 'string' && arg.includes('godot'))
+        const callback = args.find((arg) => typeof arg === 'function')
+        if (isGodot) {
+          callback(new Error('Process failed'), '', 'error output')
+        } else {
+          callback(null, 'success', '')
+        }
+        return mockChildProcess
+      })
+      ;(stat as jest.Mock).mockRejectedValue(new Error('nope'))
+    })
+
+    it('should remove the temp avatar payload file even when godot fails', async () => {
+      const writeFileMock = writeFile as jest.Mock
+      await godot.generateImages(testAvatars)
+
+      const writtenPath = writeFileMock.mock.calls[0][0] as string
+      expect(rm).toHaveBeenCalledWith(writtenPath, { force: true })
+    })
   })
 
   describe('and process fails', () => {
@@ -144,10 +177,13 @@ describe('when generating images with Godot', () => {
     })
 
     it('should timeout when process takes too long', async () => {
+      const writeFileMock = writeFile as jest.Mock
       const result = await godot.generateImages(testAvatars)
 
       expect(result.avatars[0].success).toBe(false)
       expect(result.output).toContain('timeout')
+      const writtenPath = writeFileMock.mock.calls[0][0] as string
+      expect(rm).toHaveBeenCalledWith(writtenPath, { force: true })
     }, 10_000)
   })
 })
