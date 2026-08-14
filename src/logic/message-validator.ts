@@ -2,7 +2,8 @@ import { Message } from '@aws-sdk/client-sqs'
 import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
-export type ValidationError = 'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'recently_processed_pointer'
+export type ValidationError =
+  'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'recently_processed_pointer' | 'pointer_rate_limited'
 
 export type MessagesValidationResult = {
   validMessages: Array<{
@@ -21,8 +22,9 @@ export type MessageValidator = {
 }
 
 const DEFAULT_POINTER_DEDUP_WINDOW_SECONDS = 300
+const DEFAULT_POINTER_RATE_LIMIT_SECONDS = 300
 
-export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): MessageValidator {
+export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'logs' | 'metrics'>): MessageValidator {
   const logger = logs.getLogger('message-validator')
 
   const recentlyProcessedPointers = new Map<string, { entityTimestamp: number; processedAt: number }>()
@@ -135,6 +137,16 @@ export function createMessageValidator({ logs }: Pick<AppComponents, 'logs'>): M
           if (entityTimestamp > 0 && entityTimestamp <= lastProcessed.entityTimestamp) {
             logger.debug(`Suppressing stale message for pointer ${pointer}, entity=${entityId}`)
             invalidMessages.push({ message, error: 'recently_processed_pointer' })
+            continue
+          }
+
+          const rateLimitWindowMs = DEFAULT_POINTER_RATE_LIMIT_SECONDS * 1000
+          const timeSinceLastRender = Date.now() - lastProcessed.processedAt
+          if (timeSinceLastRender < rateLimitWindowMs) {
+            logger.debug(
+              `Rate-limiting pointer ${pointer}, entity=${entityId} (rendered ${Math.floor(timeSinceLastRender / 1000)}s ago)`
+            )
+            metrics.increment('pointer_rate_limited_count', {})
             continue
           }
         }

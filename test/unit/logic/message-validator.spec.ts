@@ -1,18 +1,23 @@
 import { createLogComponent } from '@well-known-components/logger'
+import { createTestMetricsComponent } from '@dcl/metrics'
 import { createMessageValidator, MessageValidator } from '../../../src/logic/message-validator'
 import { Message } from '@aws-sdk/client-sqs'
 import { EntityType } from '@dcl/schemas'
-import { ILoggerComponent } from '@well-known-components/interfaces'
+import { ILoggerComponent, IMetricsComponent } from '@well-known-components/interfaces'
+import { metricDeclarations } from '../../../src/metrics'
 
 describe('when validating messages', () => {
   let logs: ILoggerComponent
+  let metrics: IMetricsComponent<keyof typeof metricDeclarations>
   let validator: MessageValidator
 
   let messages: Message[]
 
   beforeEach(async () => {
     logs = await createLogComponent({})
-    validator = createMessageValidator({ logs })
+    metrics = createTestMetricsComponent(metricDeclarations)
+    jest.spyOn(metrics, 'increment').mockImplementation(() => {})
+    validator = createMessageValidator({ logs, metrics })
   })
 
   describe('and messages are valid', () => {
@@ -569,7 +574,7 @@ describe('when validating messages', () => {
       expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
     })
 
-    it('should allow newer messages with higher entity timestamp', () => {
+    it('should rate-limit newer messages within the rate-limit window', () => {
       validator.markPointerProcessed('0xwallet', 1000)
 
       const messages: Message[] = [
@@ -588,11 +593,11 @@ describe('when validating messages', () => {
       ]
 
       const result = validator.validateMessages(messages)
-      expect(result.validMessages).toHaveLength(1)
+      expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
     })
 
-    it('should allow messages when incoming entity timestamp is missing even if event timestamp exists', () => {
+    it('should rate-limit messages with missing entity timestamp within the rate-limit window', () => {
       validator.markPointerProcessed('0xwallet', 2000)
 
       const messages: Message[] = [
@@ -611,7 +616,7 @@ describe('when validating messages', () => {
       ]
 
       const result = validator.validateMessages(messages)
-      expect(result.validMessages).toHaveLength(1)
+      expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
     })
 
@@ -666,6 +671,172 @@ describe('when validating messages', () => {
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(1)
       expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+    })
+  })
+
+  describe('per-pointer rate limiting', () => {
+    it('should rate-limit a newer message for a recently rendered pointer', () => {
+      validator.markPointerProcessed('0xwallet', 1000)
+
+      const result = validator.validateMessages([
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_newer',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 2000
+            }
+          })
+        }
+      ])
+
+      expect(result.validMessages).toHaveLength(0)
+      expect(result.invalidMessages).toHaveLength(0)
+      expect(metrics.increment).toHaveBeenCalledWith('pointer_rate_limited_count', {})
+    })
+
+    it('should allow a message after the rate-limit window expires', () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-14T00:00:00.000Z'))
+      try {
+        validator.markPointerProcessed('0xwallet', 1000)
+        jest.advanceTimersByTime(300_000)
+
+        const result = validator.validateMessages([
+          {
+            MessageId: '1',
+            ReceiptHandle: 'receipt1',
+            Body: JSON.stringify({
+              entity: {
+                entityId: 'entity_newer',
+                entityType: EntityType.PROFILE,
+                pointers: ['0xwallet'],
+                timestamp: 2000
+              }
+            })
+          }
+        ])
+
+        expect(result.validMessages).toHaveLength(1)
+        expect(result.invalidMessages).toHaveLength(0)
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('should still rate-limit just before the window expires', () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-14T00:00:00.000Z'))
+      try {
+        validator.markPointerProcessed('0xwallet', 1000)
+        jest.advanceTimersByTime(299_999)
+
+        const result = validator.validateMessages([
+          {
+            MessageId: '1',
+            ReceiptHandle: 'receipt1',
+            Body: JSON.stringify({
+              entity: {
+                entityId: 'entity_newer',
+                entityType: EntityType.PROFILE,
+                pointers: ['0xwallet'],
+                timestamp: 2000
+              }
+            })
+          }
+        ])
+
+        expect(result.validMessages).toHaveLength(0)
+        expect(result.invalidMessages).toHaveLength(0)
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('should not rate-limit messages without a pointer', () => {
+      validator.markPointerProcessed('0xwallet', 1000)
+
+      const result = validator.validateMessages([
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity_no_pointer',
+              entityType: EntityType.PROFILE,
+              timestamp: 2000
+            }
+          })
+        }
+      ])
+
+      expect(result.validMessages).toHaveLength(1)
+    })
+
+    it('should not rate-limit messages for a different pointer', () => {
+      validator.markPointerProcessed('0xwallet_a', 1000)
+
+      const result = validator.validateMessages([
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet_b'],
+              timestamp: 2000
+            }
+          })
+        }
+      ])
+
+      expect(result.validMessages).toHaveLength(1)
+    })
+
+    it('should suppress stale messages before checking rate limit', () => {
+      validator.markPointerProcessed('0xwallet', 2000)
+
+      const result = validator.validateMessages([
+        {
+          MessageId: '1',
+          ReceiptHandle: 'receipt1',
+          Body: JSON.stringify({
+            entity: {
+              entityId: 'entity1',
+              entityType: EntityType.PROFILE,
+              pointers: ['0xwallet'],
+              timestamp: 1000
+            }
+          })
+        }
+      ])
+
+      expect(result.validMessages).toHaveLength(0)
+      expect(result.invalidMessages).toHaveLength(1)
+      expect(result.invalidMessages[0].error).toBe('recently_processed_pointer')
+    })
+
+    it('should rate-limit multiple messages for the same pointer in rapid succession', () => {
+      validator.markPointerProcessed('0xwallet', 1000)
+
+      const messages: Message[] = Array.from({ length: 5 }, (_, i) => ({
+        MessageId: `${i + 1}`,
+        ReceiptHandle: `receipt${i + 1}`,
+        Body: JSON.stringify({
+          entity: {
+            entityId: `entity_${i + 1}`,
+            entityType: EntityType.PROFILE,
+            pointers: ['0xwallet'],
+            timestamp: 2000 + i
+          }
+        })
+      }))
+
+      const result = validator.validateMessages(messages)
+      expect(result.validMessages).toHaveLength(0)
+      expect(result.invalidMessages).toHaveLength(0)
     })
   })
 })
