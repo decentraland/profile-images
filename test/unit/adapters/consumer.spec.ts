@@ -162,6 +162,96 @@ describe('when processing messages', () => {
     })
   })
 
+  describe('and messages are rate-limited', () => {
+    it('should extend visibility for each rate-limited message with correct timeout', async () => {
+      const msg1 = createTestMessage('1')
+      const msg2 = createTestMessage('2')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [
+          { message: msg1, remainingMs: 5000 },
+          { message: msg2, remainingMs: 1500 }
+        ]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg1, msg2])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg1.ReceiptHandle, 5)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg2.ReceiptHandle, 2)
+    })
+
+    it('should ceil remainingMs to the next whole second', async () => {
+      const msg = createTestMessage('1')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [{ message: msg, remainingMs: 1 }]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg.ReceiptHandle, 1)
+    })
+
+    it('should log warning and continue when extendVisibility fails', async () => {
+      const msg1 = createTestMessage('1')
+      const msg2 = createTestMessage('2')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [
+          { message: msg1, remainingMs: 5000 },
+          { message: msg2, remainingMs: 3000 }
+        ]
+      })
+      mainQueueMock.extendVisibility.mockRejectedValueOnce(new Error('SQS error'))
+
+      await expect(consumer.processMessages(mainQueueMock, [msg1, msg2])).resolves.not.toThrow()
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg2.ReceiptHandle, 3)
+    })
+
+    it('should handle rate-limited messages alongside valid and invalid messages', async () => {
+      const validMsg = createTestMessage('1', { entity: createTestEntity('1') })
+      const invalidMsg = createTestMessage('2')
+      const rateLimitedMsg = createTestMessage('3')
+      const validEntity = createTestEntity('1')
+      const standardizedEvent = createStandardizedEvent('1', validEntity)
+
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [{ message: validMsg, event: standardizedEvent }],
+        invalidMessages: [{ message: invalidMsg, error: 'invalid_json' }],
+        rateLimitedMessages: [{ message: rateLimitedMsg, remainingMs: 10000 }]
+      })
+      imageProcessorMock.processEntities.mockResolvedValue([
+        { entity: '1', success: true, shouldRetry: false, avatar: validEntity.metadata.avatars[0].avatar }
+      ])
+
+      await consumer.processMessages(mainQueueMock, [validMsg, invalidMsg, rateLimitedMsg])
+
+      expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([invalidMsg.ReceiptHandle])
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(rateLimitedMsg.ReceiptHandle, 10)
+      expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+    })
+
+    it('should not call entity fetcher or image processor when only rate-limited messages exist', async () => {
+      const msg = createTestMessage('1')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [{ message: msg, remainingMs: 5000 }]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg.ReceiptHandle, 5)
+      expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and processing from main queue', () => {
     describe('and entities can be extracted from messages', () => {
       beforeEach(() => {
