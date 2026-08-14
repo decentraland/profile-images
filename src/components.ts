@@ -56,7 +56,7 @@ export async function initComponents(): Promise<AppComponents> {
     metrics
   })
 
-  const messageValidator = createMessageValidator({ logs })
+  const messageValidator = createMessageValidator({ logs, metrics })
 
   const mainQueueUrl = await config.requireString('QUEUE_URL')
   const mainQueue = await createQueueComponent({ sqsClient }, mainQueueUrl)

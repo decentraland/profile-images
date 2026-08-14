@@ -30,6 +30,11 @@ export const metricDeclarations = {
     help: 'Histogram of duration from SQS message publication to image generation completion',
     type: IMetricsComponent.HistogramType,
     buckets: [0.1, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600]
+  },
+  message_validation_result_total: {
+    help: 'Count of messages by validation result',
+    type: IMetricsComponent.CounterType,
+    labelNames: ['result']
   }
 }
 
