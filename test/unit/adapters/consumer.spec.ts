@@ -146,7 +146,8 @@ describe('when processing messages', () => {
       const messages = [createTestMessage('1'), createTestMessage('2')]
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [],
-        invalidMessages: messages.map((msg) => ({ message: msg, error: 'invalid_json' }))
+        invalidMessages: messages.map((msg) => ({ message: msg, error: 'invalid_json' })),
+        rateLimitedMessages: []
       })
     })
 
@@ -161,6 +162,96 @@ describe('when processing messages', () => {
     })
   })
 
+  describe('and messages are rate-limited', () => {
+    it('should extend visibility for each rate-limited message with correct timeout', async () => {
+      const msg1 = createTestMessage('1')
+      const msg2 = createTestMessage('2')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [
+          { message: msg1, remainingMs: 5000 },
+          { message: msg2, remainingMs: 1500 }
+        ]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg1, msg2])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg1.ReceiptHandle, 5)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg2.ReceiptHandle, 2)
+    })
+
+    it('should ceil remainingMs to the next whole second', async () => {
+      const msg = createTestMessage('1')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [{ message: msg, remainingMs: 1 }]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg.ReceiptHandle, 1)
+    })
+
+    it('should log warning and continue when extendVisibility fails', async () => {
+      const msg1 = createTestMessage('1')
+      const msg2 = createTestMessage('2')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [
+          { message: msg1, remainingMs: 5000 },
+          { message: msg2, remainingMs: 3000 }
+        ]
+      })
+      mainQueueMock.extendVisibility.mockRejectedValueOnce(new Error('SQS error'))
+
+      await expect(consumer.processMessages(mainQueueMock, [msg1, msg2])).resolves.not.toThrow()
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledTimes(2)
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg2.ReceiptHandle, 3)
+    })
+
+    it('should handle rate-limited messages alongside valid and invalid messages', async () => {
+      const validMsg = createTestMessage('1', { entity: createTestEntity('1') })
+      const invalidMsg = createTestMessage('2')
+      const rateLimitedMsg = createTestMessage('3')
+      const validEntity = createTestEntity('1')
+      const standardizedEvent = createStandardizedEvent('1', validEntity)
+
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [{ message: validMsg, event: standardizedEvent }],
+        invalidMessages: [{ message: invalidMsg, error: 'invalid_json' }],
+        rateLimitedMessages: [{ message: rateLimitedMsg, remainingMs: 10000 }]
+      })
+      imageProcessorMock.processEntities.mockResolvedValue([
+        { entity: '1', success: true, shouldRetry: false, avatar: validEntity.metadata.avatars[0].avatar }
+      ])
+
+      await consumer.processMessages(mainQueueMock, [validMsg, invalidMsg, rateLimitedMsg])
+
+      expect(mainQueueMock.deleteMessages).toHaveBeenCalledWith([invalidMsg.ReceiptHandle])
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(rateLimitedMsg.ReceiptHandle, 10)
+      expect(imageProcessorMock.processEntities).toHaveBeenCalled()
+    })
+
+    it('should not call entity fetcher or image processor when only rate-limited messages exist', async () => {
+      const msg = createTestMessage('1')
+      messageValidatorMock.validateMessages.mockReturnValueOnce({
+        validMessages: [],
+        invalidMessages: [],
+        rateLimitedMessages: [{ message: msg, remainingMs: 5000 }]
+      })
+
+      await consumer.processMessages(mainQueueMock, [msg])
+
+      expect(mainQueueMock.extendVisibility).toHaveBeenCalledWith(msg.ReceiptHandle, 5)
+      expect(entityFetcherMock.getEntitiesByIds).not.toHaveBeenCalled()
+      expect(imageProcessorMock.processEntities).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and processing from main queue', () => {
     describe('and entities can be extracted from messages', () => {
       beforeEach(() => {
@@ -169,7 +260,8 @@ describe('when processing messages', () => {
 
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         imageProcessorMock.processEntities.mockResolvedValue([
           { entity: '1', success: true, shouldRetry: false, avatar: completeEntity.metadata.avatars[0].avatar }
@@ -277,7 +369,8 @@ describe('when processing messages', () => {
 
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         imageProcessorMock.processEntities.mockResolvedValue([
           { entity: '1', success: true, shouldRetry: false, avatar: completeEntity.metadata.avatars[0].avatar }
@@ -326,7 +419,8 @@ describe('when processing messages', () => {
             { message: message1, event: createStandardizedEvent('1', entity1) },
             { message: message2, event: createStandardizedEvent('2', entity2) }
           ],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         imageProcessorMock.processEntities.mockResolvedValue([
           { entity: '1', success: true, shouldRetry: false, avatar: entity1.metadata.avatars[0].avatar },
@@ -359,7 +453,8 @@ describe('when processing messages', () => {
 
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -404,7 +499,8 @@ describe('when processing messages', () => {
             { message: message1, event: standardizedEvent1 },
             { message: message2, event: standardizedEvent2 }
           ],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity2])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -433,7 +529,8 @@ describe('when processing messages', () => {
         standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -460,7 +557,8 @@ describe('when processing messages', () => {
           const standardizedEvent = createStandardizedEvent('1', entity)
           messageValidatorMock.validateMessages.mockReturnValue({
             validMessages: [{ message, event: { ...standardizedEvent, timestamp: Date.now() + 60000 } }],
-            invalidMessages: []
+            invalidMessages: [],
+            rateLimitedMessages: []
           })
         })
 
@@ -483,7 +581,8 @@ describe('when processing messages', () => {
 
           messageValidatorMock.validateMessages.mockReturnValue({
             validMessages: [{ message, event: standardizedEvent }],
-            invalidMessages: []
+            invalidMessages: [],
+            rateLimitedMessages: []
           })
           entityFetcherMock.getEntitiesByIds.mockResolvedValue([malformedEntity])
           imageProcessorMock.processEntities.mockResolvedValue([
@@ -505,7 +604,8 @@ describe('when processing messages', () => {
         const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -532,7 +632,8 @@ describe('when processing messages', () => {
         const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -560,7 +661,8 @@ describe('when processing messages', () => {
         const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -601,7 +703,8 @@ describe('when processing messages', () => {
 
           messageValidatorMock.validateMessages.mockReturnValue({
             validMessages: [{ message: messageWithLowReceiveCount, event: standardizedEvent }],
-            invalidMessages: []
+            invalidMessages: [],
+            rateLimitedMessages: []
           })
         })
 
@@ -632,7 +735,8 @@ describe('when processing messages', () => {
 
           messageValidatorMock.validateMessages.mockReturnValue({
             validMessages: [{ message: messageWithMaxReceiveCount, event: standardizedEvent }],
-            invalidMessages: []
+            invalidMessages: [],
+            rateLimitedMessages: []
           })
         })
 
@@ -663,7 +767,8 @@ describe('when processing messages', () => {
 
           messageValidatorMock.validateMessages.mockReturnValue({
             validMessages: [{ message: messageWithHighReceiveCount, event: standardizedEvent }],
-            invalidMessages: []
+            invalidMessages: [],
+            rateLimitedMessages: []
           })
         })
 
@@ -694,7 +799,8 @@ describe('when processing messages', () => {
 
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message: messageWithLowReceiveCount, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -727,7 +833,8 @@ describe('when processing messages', () => {
         const standardizedEvent = createStandardizedEvent('1', entity)
         messageValidatorMock.validateMessages.mockReturnValue({
           validMessages: [{ message, event: standardizedEvent }],
-          invalidMessages: []
+          invalidMessages: [],
+          rateLimitedMessages: []
         })
         entityFetcherMock.getEntitiesByIds.mockResolvedValue([entity])
         imageProcessorMock.processEntities.mockResolvedValue([
@@ -753,7 +860,8 @@ describe('when processing messages', () => {
     beforeEach(() => {
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [],
-        invalidMessages: []
+        invalidMessages: [],
+        rateLimitedMessages: []
       })
     })
 
@@ -781,7 +889,8 @@ describe('when processing messages', () => {
 
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: standardizedEvent }],
-        invalidMessages: []
+        invalidMessages: [],
+        rateLimitedMessages: []
       })
       entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
     })
@@ -810,7 +919,8 @@ describe('when processing messages', () => {
 
       messageValidatorMock.validateMessages.mockReturnValueOnce({
         validMessages: [{ message, event: standardizedEvent }],
-        invalidMessages: []
+        invalidMessages: [],
+        rateLimitedMessages: []
       })
       entityFetcherMock.getEntitiesByIds.mockResolvedValueOnce([])
     })

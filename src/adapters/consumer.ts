@@ -61,11 +61,24 @@ export async function createConsumerComponent({
     const queueName = isDLQ(queue) ? 'DLQ' : 'main'
     logger.debug(`Processing: ${messages.length} profiles from ${queueName} queue`)
 
-    const { validMessages, invalidMessages } = messageValidator.validateMessages(messages)
+    const { validMessages, invalidMessages, rateLimitedMessages } = messageValidator.validateMessages(messages)
 
     if (invalidMessages.length > 0) {
       logger.warn(`Deleting ${invalidMessages.length} invalid messages from ${queueName} queue`)
       await queue.deleteMessages(invalidMessages.map(({ message }) => message.ReceiptHandle!))
+    }
+
+    if (rateLimitedMessages.length > 0) {
+      logger.debug(`Deferring ${rateLimitedMessages.length} rate-limited messages with adjusted visibility`)
+      for (const { message: rateLimitedMessage, remainingMs } of rateLimitedMessages) {
+        try {
+          await queue.extendVisibility(rateLimitedMessage.ReceiptHandle!, Math.ceil(remainingMs / 1000))
+        } catch (error) {
+          logger.warn(`Failed to extend visibility for rate-limited message ${rateLimitedMessage.MessageId}`, {
+            error: String(error)
+          })
+        }
+      }
     }
 
     if (validMessages.length === 0) {

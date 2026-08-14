@@ -13,6 +13,10 @@ export type MessagesValidationResult = {
     message: Message
     error: ValidationError
   }>
+  rateLimitedMessages: Array<{
+    message: Message
+    remainingMs: number
+  }>
 }
 
 export type MessageValidator = {
@@ -62,6 +66,7 @@ export function createMessageValidator(
 
     const validMessages: MessagesValidationResult['validMessages'] = []
     const invalidMessages: MessagesValidationResult['invalidMessages'] = []
+    const rateLimitedMessages: MessagesValidationResult['rateLimitedMessages'] = []
     const candidateMessages: Array<{
       message: Message
       event: CatalystDeploymentEvent
@@ -153,9 +158,11 @@ export function createMessageValidator(
           const rateLimitWindowMs = pointerRateLimitSeconds * 1000
           const timeSinceLastRender = Date.now() - lastProcessed.processedAt
           if (timeSinceLastRender < rateLimitWindowMs) {
+            const remainingMs = rateLimitWindowMs - timeSinceLastRender
             logger.debug(
-              `Rate-limiting pointer ${pointer}, entity=${entityId} (rendered ${Math.floor(timeSinceLastRender / 1000)}s ago)`
+              `Rate-limiting pointer ${pointer}, entity=${entityId} (rendered ${Math.floor(timeSinceLastRender / 1000)}s ago, ${Math.ceil(remainingMs / 1000)}s remaining)`
             )
+            rateLimitedMessages.push({ message, remainingMs })
             metrics.increment('message_validation_result_total', { result: 'rate_limited' })
             continue
           }
@@ -204,7 +211,7 @@ export function createMessageValidator(
       metrics.increment('message_validation_result_total', { result: 'valid' })
     }
 
-    return { validMessages, invalidMessages }
+    return { validMessages, invalidMessages, rateLimitedMessages }
   }
 
   return { validateMessages, markPointerProcessed }
