@@ -69,6 +69,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with undefined Body`
         )
         invalidMessages.push({ message, error: 'undefined_body' })
+        metrics.increment('message_validation_result_total', { result: 'undefined_body' })
         continue
       }
 
@@ -80,6 +81,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} has invalid JSON`
         )
         invalidMessages.push({ message, error: 'invalid_json' })
+        metrics.increment('message_validation_result_total', { result: 'invalid_json' })
         continue
       }
 
@@ -94,6 +96,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid Body: ${message.Body}`
         )
         invalidMessages.push({ message, error: 'invalid_entity_type' })
+        metrics.increment('message_validation_result_total', { result: 'invalid_entity_type' })
         continue
       }
 
@@ -104,6 +107,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
           `Message with MessageId=${message.MessageId} and ReceiptHandle=${message.ReceiptHandle} arrived with invalid entity type: ${entityType}`
         )
         invalidMessages.push({ message, error: 'invalid_entity_type' })
+        metrics.increment('message_validation_result_total', { result: 'invalid_entity_type' })
         continue
       }
 
@@ -136,6 +140,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
           if (entityTimestamp > 0 && entityTimestamp <= lastProcessed.entityTimestamp) {
             logger.debug(`Suppressing stale message for pointer ${pointer}, entity=${entityId}`)
             invalidMessages.push({ message, error: 'recently_processed_pointer' })
+            metrics.increment('message_validation_result_total', { result: 'stale_pointer' })
             continue
           }
 
@@ -145,7 +150,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
             logger.debug(
               `Rate-limiting pointer ${pointer}, entity=${entityId} (rendered ${Math.floor(timeSinceLastRender / 1000)}s ago)`
             )
-            metrics.increment('pointer_rate_limited_count', {})
+            metrics.increment('message_validation_result_total', { result: 'rate_limited' })
             continue
           }
         }
@@ -184,11 +189,13 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
         logger.debug(
           `Leaving stale or duplicate same-batch message in queue for pointer ${candidate.pointer}, entity=${candidate.event.entity.id}`
         )
+        metrics.increment('message_validation_result_total', { result: 'stale_in_batch' })
         continue
       }
 
       acceptedEntityIds.add(candidate.event.entity.id)
       validMessages.push({ message: candidate.message, event: candidate.event })
+      metrics.increment('message_validation_result_total', { result: 'valid' })
     }
 
     return { validMessages, invalidMessages }

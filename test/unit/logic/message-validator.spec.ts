@@ -695,7 +695,7 @@ describe('when validating messages', () => {
 
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
-      expect(metrics.increment).toHaveBeenCalledWith('pointer_rate_limited_count', {})
+      expect(metrics.increment).toHaveBeenCalledWith('message_validation_result_total', { result: 'rate_limited' })
     })
 
     it('should allow a message after the rate-limit window expires', () => {
