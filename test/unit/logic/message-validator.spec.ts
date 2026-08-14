@@ -17,7 +17,7 @@ describe('when validating messages', () => {
     logs = await createLogComponent({})
     metrics = createTestMetricsComponent(metricDeclarations)
     jest.spyOn(metrics, 'increment').mockImplementation(() => {})
-    validator = createMessageValidator({ logs, metrics })
+    validator = createMessageValidator({ logs, metrics }, { pointerDedupWindowSeconds: 300, pointerRateLimitSeconds: 300 })
   })
 
   describe('and messages are valid', () => {
