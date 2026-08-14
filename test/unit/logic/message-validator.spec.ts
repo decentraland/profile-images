@@ -598,6 +598,8 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
+      expect(result.rateLimitedMessages).toHaveLength(1)
+      expect(result.rateLimitedMessages[0].message.MessageId).toBe('1')
     })
 
     it('should rate-limit messages with missing entity timestamp within the rate-limit window', () => {
@@ -621,6 +623,7 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
+      expect(result.rateLimitedMessages).toHaveLength(1)
     })
 
     it('should keep stale messages suppressed for the full SQS visibility timeout window', () => {
@@ -698,6 +701,10 @@ describe('when validating messages', () => {
 
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
+      expect(result.rateLimitedMessages).toHaveLength(1)
+      expect(result.rateLimitedMessages[0].message.MessageId).toBe('1')
+      expect(result.rateLimitedMessages[0].remainingMs).toBeGreaterThan(0)
+      expect(result.rateLimitedMessages[0].remainingMs).toBeLessThanOrEqual(300_000)
       expect(metrics.increment).toHaveBeenCalledWith('message_validation_result_total', { result: 'rate_limited' })
     })
 
@@ -752,6 +759,8 @@ describe('when validating messages', () => {
 
         expect(result.validMessages).toHaveLength(0)
         expect(result.invalidMessages).toHaveLength(0)
+        expect(result.rateLimitedMessages).toHaveLength(1)
+        expect(result.rateLimitedMessages[0].remainingMs).toBe(1)
       } finally {
         jest.useRealTimers()
       }
@@ -840,6 +849,40 @@ describe('when validating messages', () => {
       const result = validator.validateMessages(messages)
       expect(result.validMessages).toHaveLength(0)
       expect(result.invalidMessages).toHaveLength(0)
+      expect(result.rateLimitedMessages).toHaveLength(5)
+    })
+
+    it('should report correct remainingMs for a rate-limited message', () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-14T00:00:00.000Z'))
+      try {
+        validator = createMessageValidator(
+          { logs, metrics },
+          { pointerDedupWindowSeconds: 2, pointerRateLimitSeconds: 2 }
+        )
+        validator.markPointerProcessed('0xwallet', 1000)
+        jest.advanceTimersByTime(500)
+
+        const result = validator.validateMessages([
+          {
+            MessageId: '1',
+            ReceiptHandle: 'receipt1',
+            Body: JSON.stringify({
+              entity: {
+                entityId: 'entity_newer',
+                entityType: EntityType.PROFILE,
+                pointers: ['0xwallet'],
+                timestamp: 2000
+              }
+            })
+          }
+        ])
+
+        expect(result.rateLimitedMessages).toHaveLength(1)
+        expect(result.rateLimitedMessages[0].remainingMs).toBe(1500)
+        expect(result.rateLimitedMessages[0].message.MessageId).toBe('1')
+      } finally {
+        jest.useRealTimers()
+      }
     })
   })
 })
