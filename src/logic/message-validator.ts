@@ -2,8 +2,7 @@ import { Message } from '@aws-sdk/client-sqs'
 import { CatalystDeploymentEvent, EntityType, Events } from '@dcl/schemas'
 import { AppComponents } from '../types'
 
-export type ValidationError =
-  'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'recently_processed_pointer' | 'pointer_rate_limited'
+export type ValidationError = 'undefined_body' | 'invalid_json' | 'invalid_entity_type' | 'recently_processed_pointer'
 
 export type MessagesValidationResult = {
   validMessages: Array<{
@@ -52,7 +51,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
   }
 
   function validateMessages(messages: Message[]): MessagesValidationResult {
-    const windowMs = DEFAULT_POINTER_DEDUP_WINDOW_SECONDS * 1000
+    const windowMs = Math.max(DEFAULT_POINTER_DEDUP_WINDOW_SECONDS, DEFAULT_POINTER_RATE_LIMIT_SECONDS) * 1000
     pruneExpiredPointers(windowMs)
 
     const validMessages: MessagesValidationResult['validMessages'] = []
