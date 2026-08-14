@@ -20,11 +20,17 @@ export type MessageValidator = {
   markPointerProcessed: (pointer: string, entityTimestamp: number) => void
 }
 
-const DEFAULT_POINTER_DEDUP_WINDOW_SECONDS = 300
-const DEFAULT_POINTER_RATE_LIMIT_SECONDS = 300
+export type RateLimitConfig = {
+  pointerDedupWindowSeconds: number
+  pointerRateLimitSeconds: number
+}
 
-export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'logs' | 'metrics'>): MessageValidator {
+export function createMessageValidator(
+  { logs, metrics }: Pick<AppComponents, 'logs' | 'metrics'>,
+  rateLimitConfig: RateLimitConfig
+): MessageValidator {
   const logger = logs.getLogger('message-validator')
+  const { pointerDedupWindowSeconds, pointerRateLimitSeconds } = rateLimitConfig
 
   const recentlyProcessedPointers = new Map<string, { entityTimestamp: number; processedAt: number }>()
 
@@ -51,7 +57,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
   }
 
   function validateMessages(messages: Message[]): MessagesValidationResult {
-    const windowMs = Math.max(DEFAULT_POINTER_DEDUP_WINDOW_SECONDS, DEFAULT_POINTER_RATE_LIMIT_SECONDS) * 1000
+    const windowMs = Math.max(pointerDedupWindowSeconds, pointerRateLimitSeconds) * 1000
     pruneExpiredPointers(windowMs)
 
     const validMessages: MessagesValidationResult['validMessages'] = []
@@ -144,7 +150,7 @@ export function createMessageValidator({ logs, metrics }: Pick<AppComponents, 'l
             continue
           }
 
-          const rateLimitWindowMs = DEFAULT_POINTER_RATE_LIMIT_SECONDS * 1000
+          const rateLimitWindowMs = pointerRateLimitSeconds * 1000
           const timeSinceLastRender = Date.now() - lastProcessed.processedAt
           if (timeSinceLastRender < rateLimitWindowMs) {
             logger.debug(

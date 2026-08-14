@@ -28,6 +28,9 @@ export const test = createRunner<TestComponents>({
 })
 
 async function initComponents(): Promise<TestComponents> {
+  process.env.POINTER_DEDUP_WINDOW_SECONDS ??= '1'
+  process.env.POINTER_RATE_LIMIT_SECONDS ??= '1'
+
   const components = await originalInitComponents()
 
   const config = await createDotEnvConfigComponent({

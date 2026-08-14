@@ -56,7 +56,12 @@ export async function initComponents(): Promise<AppComponents> {
     metrics
   })
 
-  const messageValidator = createMessageValidator({ logs, metrics })
+  const pointerDedupWindowSeconds = await config.requireNumber('POINTER_DEDUP_WINDOW_SECONDS')
+  const pointerRateLimitSeconds = await config.requireNumber('POINTER_RATE_LIMIT_SECONDS')
+  const messageValidator = createMessageValidator(
+    { logs, metrics },
+    { pointerDedupWindowSeconds, pointerRateLimitSeconds }
+  )
 
   const mainQueueUrl = await config.requireString('QUEUE_URL')
   const mainQueue = await createQueueComponent({ sqsClient }, mainQueueUrl)
